@@ -1,8 +1,22 @@
 schema_version: v0.1
-capability: my-first-app.greet.user.v1
+capability: my-first-app.greet.user.v2
 owner_repo: my-first-app
 visibility: public
 capabilities:
+  - name: my-first-app.greet.user.v2
+    visibility: public
+    status: declared
+    description: >-
+      Given a caller-supplied name, return a greeting string with a stable
+      response shape and explicit metadata indicating whether the default name
+      was used.
+    invariants:
+      - MY-FIRST-APP-INV-02
+    proofs:
+      - id: local-invariant-MY-FIRST-APP-INV-02
+        type: local_invariant
+        status: generated_by_tests
+        path: null
   - name: my-first-app.greet.user.v1
     visibility: public
     status: declared

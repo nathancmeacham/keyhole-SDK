@@ -3,10 +3,12 @@ repo: my-first-app
 parent_repo: null
 
 produces:
+  - my-first-app.greet.user.v2
   - my-first-app.greet.user.v1
 
 required_tests:
   - tests/test_inv_greet_capability.py
+  - tests/test_inv_greet_v2_capability.py
 
 local_invariants:
   - id: MY-FIRST-APP-INV-01
@@ -15,6 +17,14 @@ local_invariants:
       The greet.user.v1 response always contains 'greeting' (str) and
       'name' (str). The shape must not regress. Checked on every commit.
     gate: tests/invariants/inv_greet.py
+    verdict_required: ACCEPT
+  - id: MY-FIRST-APP-INV-02
+    name: GREET-USER-V2-CAPABILITY-SHAPE-STABLE
+    description: >-
+      The greet.user.v2 response always contains 'greeting' (str),
+      'name' (str), and 'defaulted' (bool). The shape must not regress.
+      Checked on every commit.
+    gate: tests/invariants/inv_greet_v2.py
     verdict_required: ACCEPT
 
 compatibility_contracts: []
