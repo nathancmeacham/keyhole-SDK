@@ -1,16 +1,19 @@
 schema_version: v0.1
 dependencies:
   - id: keyhole-test-runtime.realize.v1
+    capability: keyhole.test-runtime.realize.v1
     kind: runtime_bridge
     required_for: governed_realization
     mode: governed
     evidence_required: runtime_governance_receipt
   - id: keyhole.mcp.governance-boundary.v1
+    capability: keyhole.mcp.governance-boundary.v1
     kind: governance_boundary
     required_for: repo_registration_context_compile_and_run
     mode: governed
     evidence_required: governance_context_id
   - id: keyhole.event-spine.evidence-ref.v1
+    capability: keyhole.event-spine.evidence-ref.v1
     kind: evidence_reference
     required_for: upstream_auditability
     mode: governed
