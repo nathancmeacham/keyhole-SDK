@@ -13,10 +13,12 @@ from keyhole_cli.commands.governed_flow_cmd import (
     run_governed_resume,
     run_governed_status,
 )
+from keyhole_cli.commands.login import run_login
 from keyhole_cli.commands.repo_register_cmd import run_repo_register
 from keyhole_cli.commands.run_cmd import run_run
 from keyhole_cli.commands.validate_cmd import run_validate
-from keyhole_cli.result import emit
+from keyhole_cli.result import CommandResult, EXIT_INVALID_INPUT, emit
+from keyhole_sdk.config import DEFAULT_AUTH_SERVER, DEFAULT_BASE_URL, DEFAULT_REALM
 
 
 app = typer.Typer(
@@ -101,6 +103,82 @@ def validate(
             quiet=quiet,
             state_dir=state_dir,
             keyhole_home=keyhole_home,
+        ),
+        use_json=use_json,
+    )
+
+
+@app.command("login")
+def login(
+    flow: str = typer.Option("pkce", "--flow", help="Authentication flow: pkce, device, password, or passwordless."),
+    device: bool = typer.Option(False, "--device", help="Convenience alias for --flow device."),
+    force: bool = typer.Option(False, "--force", help="Force a fresh login instead of reusing stored credentials."),
+    auth_server_url: str = typer.Option(
+        DEFAULT_AUTH_SERVER,
+        "--auth-server-url",
+        envvar="KEYHOLE_AUTH_SERVER",
+        help="Auth server URL.",
+    ),
+    client_id: str = typer.Option("keyhole-cli", "--client-id", envvar="KEYHOLE_CLIENT_ID", help="Auth client ID."),
+    mcp_base_url: str = typer.Option(
+        DEFAULT_BASE_URL,
+        "--mcp-url",
+        envvar="KEYHOLE_MCP_URL",
+        help="Governed server base URL.",
+    ),
+    username: str = typer.Option("", "--username", help="Username for password flow."),
+    password: str = typer.Option("", "--password", help="Password for password flow. Avoid shell history in shared environments."),
+    email: str = typer.Option("", "--email", help="Email for passwordless flow."),
+    realm: str = typer.Option(DEFAULT_REALM, "--realm", envvar="KEYHOLE_REALM", help="Auth realm."),
+    allow_split_identity: bool = typer.Option(
+        False,
+        "--allow-split-identity",
+        help="Allow CLI identity to differ from host attestation identity.",
+    ),
+    use_json: bool = typer.Option(False, "--json", help="Machine-readable JSON output."),
+) -> None:
+    """Authenticate and store local credentials for live governed commands."""
+    selected_flow = "device" if device else flow
+    if device and flow.lower() != "pkce" and flow.lower() != "device":
+        emit(
+            CommandResult(
+                command="login",
+                success=False,
+                exit_code=EXIT_INVALID_INPUT,
+                data={"error_class": "conflicting_login_flow", "flow": flow},
+                summary="--device is an alias for --flow device and cannot be combined with another flow.",
+                next_steps=["Use: keyhole login --device --force", "Or: keyhole login --flow device --force"],
+            ),
+            use_json=use_json,
+        )
+    if selected_flow.lower() in {"pkce", "device", "password", "passwordless"} and not auth_server_url:
+        emit(
+            CommandResult(
+                command="login",
+                success=False,
+                exit_code=EXIT_INVALID_INPUT,
+                data={"error_class": "missing_auth_server", "flow": selected_flow},
+                summary="KEYHOLE_AUTH_SERVER is required for login; set it or pass --auth-server-url.",
+                next_steps=[
+                    "Set KEYHOLE_AUTH_SERVER to your auth server URL.",
+                    "Or run: keyhole login --flow device --force --auth-server-url <url>",
+                ],
+            ),
+            use_json=use_json,
+        )
+    emit(
+        run_login(
+            flow=selected_flow,
+            force=force,
+            auth_server_url=auth_server_url,
+            client_id=client_id,
+            mcp_base_url=mcp_base_url,
+            username=username or None,
+            password=password or None,
+            email=email or None,
+            realm=realm,
+            allow_split_identity=allow_split_identity,
+            _flow_explicit=device or flow.lower() != "pkce",
         ),
         use_json=use_json,
     )
