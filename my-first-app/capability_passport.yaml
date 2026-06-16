@@ -21,6 +21,20 @@ capabilities:
         status: generated_by_tests
         path: proof_bundle/core/inv-01/inv-01-result.json
 
+  - name: my-first-app.greet.user.v2
+    visibility: private
+    status: declared
+    description: >-
+      Given a caller-supplied name, return a governed greeting string with
+      explicit metadata indicating whether the default name was used.
+    invariants:
+      - MY-FIRST-APP-INV-02
+    proofs:
+      - id: local-invariant-MY-FIRST-APP-INV-02
+        type: local_invariant
+        status: generated_by_tests
+        path: null
+
 owner_repo: my-first-app
 visibility: private
 proofs:

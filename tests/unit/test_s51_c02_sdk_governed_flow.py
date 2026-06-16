@@ -16,6 +16,7 @@ for path in (SDK_ROOT, TEST_DIR):
         sys.path.insert(0, str(path))
 
 from keyhole_sdk.governed_demo import GovernedDemoError, GovernedFirstAppClient
+from keyhole_sdk.governed_flow import read_repo_declaration
 import keyhole_sdk.governed_demo as governed_demo
 from s51_c02_fakes import FakeBoundarySession
 
@@ -34,6 +35,19 @@ def test_sdk_discovers_capabilities_and_required_operations() -> None:
     assert "repo.register" in operations
     assert "context.compile" in operations
     assert "governed.realize" in operations
+
+
+def test_first_app_v2_capability_can_be_selected() -> None:
+    declaration = read_repo_declaration(
+        APP_ROOT,
+        capability_id="my-first-app.greet.user.v2",
+    )
+
+    assert declaration.capability_id == "my-first-app.greet.user.v2"
+    passport_capabilities = declaration.native_artifacts["capability_passport"]["capabilities"]
+    declared = {item["name"] for item in passport_capabilities}
+    assert "my-first-app.greet.user.v1" in declared
+    assert "my-first-app.greet.user.v2" in declared
 
 
 def test_sdk_unwraps_live_envelope_and_resolves_logical_operations() -> None:
