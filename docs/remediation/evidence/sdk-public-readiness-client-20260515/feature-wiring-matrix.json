@@ -1,0 +1,203 @@
+﻿{
+    "features":  [
+                     {
+                         "feature":  "auth.login",
+                         "overall":  "PASS",
+                         "public_example":  "examples/python-client/whoami.py",
+                         "cli_command":  "keyhole login",
+                         "error_path":  "PASS",
+                         "test":  "tests/unit/ auth tests",
+                         "sdk_method":  "AuthBootstrapClient.login()",
+                         "mcp_endpoint":  "POST /mcp/v1 (PKCE/device/passwordless)",
+                         "docs":  "docs/auth-bootstrap.md"
+                     },
+                     {
+                         "feature":  "auth.logout",
+                         "overall":  "PASS",
+                         "public_example":  "MISSING",
+                         "cli_command":  "keyhole logout",
+                         "error_path":  "PASS",
+                         "test":  "PARTIAL",
+                         "sdk_method":  "AuthBootstrapClient.logout()",
+                         "mcp_endpoint":  "token revocation (OIDC)",
+                         "docs":  "PARTIAL"
+                     },
+                     {
+                         "feature":  "auth.whoami",
+                         "overall":  "PASS",
+                         "public_example":  "examples/python-client/whoami.py",
+                         "cli_command":  "keyhole whoami",
+                         "error_path":  "PASS",
+                         "test":  "PASS",
+                         "sdk_method":  "KeyholeClient.whoami()",
+                         "mcp_endpoint":  "GET /mcp/v1/whoami",
+                         "docs":  "PARTIAL"
+                     },
+                     {
+                         "feature":  "config.resolve",
+                         "overall":  "PASS",
+                         "public_example":  "MISSING",
+                         "cli_command":  "IMPLICIT (env vars)",
+                         "error_path":  "PASS",
+                         "test":  "unit tests",
+                         "sdk_method":  "KeyholeConfig",
+                         "mcp_endpoint":  "N/A",
+                         "docs":  "PARTIAL"
+                     },
+                     {
+                         "feature":  "doctor.run",
+                         "overall":  "PARTIAL",
+                         "public_example":  "MISSING",
+                         "cli_command":  "keyhole doctor",
+                         "error_path":  "PASS",
+                         "test":  "PARTIAL",
+                         "sdk_method":  "N/A",
+                         "mcp_endpoint":  "GET /mcp/v1/capabilities",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "vertical.init",
+                         "overall":  "PASS",
+                         "public_example":  "examples/second-governed-app/",
+                         "cli_command":  "keyhole init vertical",
+                         "error_path":  "PASS",
+                         "test":  "PARTIAL",
+                         "sdk_method":  "N/A (scaffold only)",
+                         "mcp_endpoint":  "N/A",
+                         "docs":  "docs/quickstart.md"
+                     },
+                     {
+                         "feature":  "repo.validate",
+                         "overall":  "CLIENT_DEFECT",
+                         "public_example":  "MISSING",
+                         "cli_command":  "keyhole validate",
+                         "error_path":  "RESOLVED — PyYAML is a declared SDK dependency",
+                         "test":  "PASS",
+                         "sdk_method":  "validate_repo()",
+                         "mcp_endpoint":  "N/A (local)",
+                         "docs":  "PARTIAL"
+                     },
+                     {
+                         "feature":  "context.compile",
+                         "overall":  "SERVER_BLOCKED",
+                         "public_example":  "examples/python-client/retrieve_context.py",
+                         "cli_command":  "keyhole context compile",
+                         "error_path":  "PASS (returns blocked message clearly)",
+                         "test":  "PARTIAL",
+                         "sdk_method":  "ContextClient.compile_context()",
+                         "mcp_endpoint":  "POST /mcp/v1/runs/start (context.compile)",
+                         "docs":  "PARTIAL"
+                     },
+                     {
+                         "feature":  "gaps.list",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "COMMAND_MISSING (workaround: keyhole run --run-type gaps.list)",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "POST /mcp/v1/runs/start (gaps.list)",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "gaps.create",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "COMMAND_MISSING",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "UNKNOWN",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "gaps.claim",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "COMMAND_MISSING",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "UNKNOWN",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "workspace.provision",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "COMMAND_MISSING",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "POST /mcp/v1/runs/start (workspace.provision)",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "proof.bundle.create",
+                         "overall":  "PARTIAL",
+                         "public_example":  "examples/second-governed-app/tests/invariants/",
+                         "cli_command":  "IMPLICIT (local gate runner)",
+                         "error_path":  "PARTIAL",
+                         "test":  "inv_greet.py (local)",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "N/A",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "proof.submit",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "COMMAND_MISSING",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "UNKNOWN",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "receipt.verify",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "COMMAND_MISSING",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "UNKNOWN",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "capability.register",
+                         "overall":  "COMMAND_MISSING",
+                         "public_example":  "MISSING",
+                         "cli_command":  "keyhole capability create (validate only — NOT register)",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "MISSING",
+                         "mcp_endpoint":  "UNKNOWN",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "events.query",
+                         "overall":  "PARTIAL",
+                         "public_example":  "examples/python-client/get_evidence.py",
+                         "cli_command":  "MISSING (MCP tool only)",
+                         "error_path":  "MISSING",
+                         "test":  "MISSING",
+                         "sdk_method":  "PARTIAL (example scripts)",
+                         "mcp_endpoint":  "POST /mcp/v1/events/query",
+                         "docs":  "MISSING"
+                     },
+                     {
+                         "feature":  "runs.start",
+                         "overall":  "PASS",
+                         "public_example":  "examples/python-client/safe_dispatch.py",
+                         "cli_command":  "keyhole run --run-type",
+                         "error_path":  "PASS",
+                         "test":  "PARTIAL",
+                         "sdk_method":  "KeyholeClient.start_run()",
+                         "mcp_endpoint":  "POST /mcp/v1/runs/start",
+                         "docs":  "PARTIAL"
+                     }
+                 ],
+    "audit_date":  "2026-05-15"
+}

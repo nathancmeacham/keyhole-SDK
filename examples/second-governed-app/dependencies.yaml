@@ -1,0 +1,8 @@
+schema_version: v0.1
+dependencies:
+  - id: keyhole.mcp.governance-boundary.v1
+    capability: keyhole.mcp.governance-boundary.v1
+    kind: governance_boundary
+    required_for: governed_repo_flow
+    mode: governed
+    evidence_required: governance_context_id

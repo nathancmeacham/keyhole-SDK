@@ -9,6 +9,7 @@ confidence. Never mutates the target repo.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,7 @@ from keyhole_sdk.ingest.proof import emit_ingestion_proof
 from keyhole_sdk.ingest.repair import map_ingestion_repair
 from keyhole_sdk.ingest.scanner import scan_repo
 from keyhole_sdk.ingest.submitter import submit_ingestion
+from keyhole_sdk.repo_identity import RepoIdentityError, detect_repo_identity
 from keyhole_sdk.transport.client import GovernedTransport
 from keyhole_sdk.transport.idempotency import generate_request_id
 
@@ -46,6 +48,7 @@ def run_ingest(
     exclude: Optional[List[str]] = None,
     max_bytes: int = 0,
     summary_only: bool = False,
+    gap_id: str = "",
     mcp_url: str = DEFAULT_BASE_URL,
     keyhole_home: str = "",
 ) -> CommandResult:
@@ -107,10 +110,21 @@ def run_ingest(
 
     # ── Build package (§10) ──
     correlation_id = generate_request_id()
+    resolved_gap_id = gap_id.strip() or os.environ.get("KEYHOLE_GAP_ID", "").strip()
+    repo_identity = None
+    try:
+        repo_identity = detect_repo_identity(str(target))
+    except RepoIdentityError:
+        repo_identity = None
+
     package = build_ingestion_package(
         scan,
         shadow=shadow,
         correlation_id=correlation_id,
+        gap_id=resolved_gap_id,
+        repo_remote=repo_identity.repo_remote if repo_identity else "",
+        commit_sha=repo_identity.commit_sha if repo_identity else "",
+        current_branch=repo_identity.current_branch if repo_identity else "",
         exclusion_rules=file_filter.exclude_rules,
     )
 
@@ -126,10 +140,20 @@ def run_ingest(
     store_dir = Path(keyhole_home) if keyhole_home else None
     cred_store = CredentialStore(store_dir=store_dir)
     session = cred_store.load()
+    if not session:
+        return CommandResult(
+            command=command_label,
+            success=False,
+            exit_code=EXIT_FAILURE,
+            summary="Not authenticated. Run 'keyhole login' first.",
+            data={"error_class": "AuthenticationError", "is_local": True},
+            next_steps=map_ingestion_repair("AuthenticationError"),
+        )
+
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
-        token = ""
+        token = session.access_token if session else ""
     identity_fp = session.token_fingerprint if session else ""
 
     if not token:
@@ -146,6 +170,9 @@ def run_ingest(
     request = IngestionRequest(
         package=package,
         identity_fingerprint=identity_fp,
+        gap_id=resolved_gap_id,
+        repo_remote=repo_identity.repo_remote if repo_identity else "",
+        commit_sha=repo_identity.commit_sha if repo_identity else "",
     )
 
     # ── Build transport ──
@@ -197,6 +224,9 @@ def _render_summary_only(
             "mode": "summary_only",
             "repo_root": scan.repo_root,
             "repo_identity": package.repo_identity,
+            "gap_id": package.gap_id,
+            "repo_remote": package.repo_remote,
+            "commit_sha": package.commit_sha,
             "languages": package.languages,
             "frameworks": package.frameworks,
             "manifests": package.manifests,

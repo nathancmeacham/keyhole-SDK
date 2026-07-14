@@ -75,9 +75,9 @@ def run_repo_register(
     cred_store = CredentialStore(store_dir=store_dir)
     session = cred_store.load()
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
-        token = ""
+        token = session.access_token if session else ""
     identity_fp = session.token_fingerprint if session else ""
     has_auth = bool(token)
 

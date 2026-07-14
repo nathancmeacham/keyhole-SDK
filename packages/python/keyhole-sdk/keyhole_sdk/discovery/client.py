@@ -119,15 +119,16 @@ class CapabilitiesClient:
         defaults to empty/zero.  Never invents fields not present
         in the raw response.
         """
-        contract = _extract_contract(raw)
-        compatibility = _extract_compatibility(raw)
-        transport = _extract_transport(raw)
-        auth = _extract_auth(raw)
-        features = _extract_features(raw)
-        context_access = _extract_context_access(raw)
-        guidance = _extract_guidance(raw)
-        metadata = _extract_metadata(raw)
-        connection_surfaces = _extract_connection_surfaces(raw)
+        body = _capabilities_body(raw)
+        contract = _extract_contract(body)
+        compatibility = _extract_compatibility(body)
+        transport = _extract_transport(body)
+        auth = _extract_auth(body)
+        features = _extract_features(body)
+        context_access = _extract_context_access(body)
+        guidance = _extract_guidance(body)
+        metadata = _extract_metadata(body, raw)
+        connection_surfaces = _extract_connection_surfaces(body)
 
         return CapabilitiesResult(
             contract=contract,
@@ -191,13 +192,22 @@ def _safe_dict(d: Any, key: str) -> Dict[str, Any]:
     return dict(val) if isinstance(val, dict) else {}
 
 
+def _capabilities_body(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the capabilities payload from either raw or MCP envelope form."""
+    data = raw.get("data")
+    return data if isinstance(data, dict) else raw
+
+
 def _extract_contract(raw: Dict[str, Any]) -> ContractIdentity:
     """Extract contract identity from raw capabilities."""
     return ContractIdentity(
         contract=_safe_str(raw, "contract"),
         schema_versions=_safe_dict(raw, "schema_versions"),
         operations_declared=_safe_int(raw, "operations_declared"),
-        operations_implemented=_safe_int(raw, "operations_implemented"),
+        operations_implemented=(
+            _safe_int(raw, "operations_implemented")
+            or _safe_int(raw, "implemented_ops_count")
+        ),
     )
 
 
@@ -230,16 +240,32 @@ def _extract_auth(raw: Dict[str, Any]) -> AuthPosture:
     """
     auth = _safe_dict(raw, "auth")
     endpoints = _safe_dict(raw, "endpoints")
+    worker = _safe_dict(raw, "governed_worker_sdk")
+    preflight = _safe_dict(worker, "preflight")
+    whoami = _safe_dict(preflight, "whoami")
+    capabilities = _safe_dict(preflight, "capabilities")
     supported_flows = [
         str(f) for f in _safe_list(auth, "supported_flows")
         if isinstance(f, str) and f
     ]
+    identity_endpoint = (
+        _safe_str(endpoints, "identity")
+        or _safe_str(whoami, "path")
+    )
+    discovery_endpoint = (
+        _safe_str(endpoints, "discovery")
+        or _safe_str(capabilities, "path")
+    )
+    run_dispatch_endpoint = (
+        _safe_str(endpoints, "run_dispatch")
+        or _first_run_dispatch_endpoint(raw)
+    )
     return AuthPosture(
         auth_flow=_safe_str(auth, "flow") or _safe_str(auth, "auth_flow"),
         auth_realm=_safe_str(auth, "realm") or _safe_str(auth, "auth_realm"),
-        discovery_endpoint=_safe_str(endpoints, "discovery"),
-        identity_endpoint=_safe_str(endpoints, "identity"),
-        run_dispatch_endpoint=_safe_str(endpoints, "run_dispatch"),
+        discovery_endpoint=discovery_endpoint,
+        identity_endpoint=identity_endpoint,
+        run_dispatch_endpoint=run_dispatch_endpoint,
         event_query_endpoint=_safe_str(endpoints, "event_query"),
         supported_flows=supported_flows,
         preferred_interactive_flow=_safe_str(auth, "preferred_interactive_flow"),
@@ -274,21 +300,42 @@ def _extract_guidance(raw: Dict[str, Any]) -> ClientGuidance:
     )
 
 
-def _extract_metadata(raw: Dict[str, Any]) -> DiscoveryMetadata:
+def _extract_metadata(raw: Dict[str, Any], envelope: Optional[Dict[str, Any]] = None) -> DiscoveryMetadata:
     """Extract discovery metadata from raw capabilities."""
     meta = _safe_dict(raw, "meta")
+    envelope = envelope or raw
+    envelope_meta = _safe_dict(envelope, "meta")
     return DiscoveryMetadata(
-        generated_at=_safe_str(meta, "generated_at") or _safe_str(raw, "generated_at"),
-        digest=_safe_str(meta, "digest") or _safe_str(raw, "digest"),
+        generated_at=(
+            _safe_str(meta, "generated_at")
+            or _safe_str(envelope_meta, "generated_at")
+            or _safe_str(raw, "generated_at")
+            or _safe_str(envelope, "generated_at")
+        ),
+        digest=(
+            _safe_str(meta, "digest")
+            or _safe_str(envelope_meta, "digest")
+            or _safe_str(raw, "digest")
+            or _safe_str(envelope, "digest")
+        ),
         ctx_ref_sha256=(
             _safe_str(meta, "ctx_ref_sha256")
+            or _safe_str(envelope_meta, "ctx_ref_sha256")
             or _safe_str(raw, "ctx_ref_sha256")
+            or _safe_str(envelope, "ctx_ref_sha256")
         ),
         correlation_id=(
             _safe_str(meta, "correlation_id")
+            or _safe_str(envelope_meta, "correlation_id")
             or _safe_str(raw, "correlation_id")
+            or _safe_str(envelope, "correlation_id")
         ),
-        server_time=_safe_str(meta, "server_time") or _safe_str(raw, "server_time"),
+        server_time=(
+            _safe_str(meta, "server_time")
+            or _safe_str(envelope_meta, "server_time")
+            or _safe_str(raw, "server_time")
+            or _safe_str(envelope, "server_time")
+        ),
     )
 
 
@@ -326,3 +373,15 @@ def _extract_connection_surfaces(raw: Dict[str, Any]) -> ConnectionSurfaceContra
         required_scopes=_safe_dict(cs, "required_scopes"),
         run_types=run_types,
     )
+
+
+def _first_run_dispatch_endpoint(raw: Dict[str, Any]) -> str:
+    for op in _safe_list(raw, "operations"):
+        if not isinstance(op, dict):
+            continue
+        path = _safe_str(op, "path")
+        canonical = _safe_dict(op, "canonical_endpoint")
+        canonical_path = _safe_str(canonical, "path")
+        if path == "/mcp/v1/runs/start" or canonical_path == "/mcp/v1/runs/start":
+            return "/mcp/v1/runs/start"
+    return ""

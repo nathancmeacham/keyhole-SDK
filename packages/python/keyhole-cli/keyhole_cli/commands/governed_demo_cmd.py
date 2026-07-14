@@ -55,7 +55,10 @@ def run_governed_demo_context_compile(
             exit_code=EXIT_SUCCESS,
             summary="Governed demo context compiled with MCP boundary.",
             data=_public_data(result),
-            next_steps=["Run: keyhole run --context auto --repo-dir my-first-app --json"],
+            next_steps=[
+                "For public launch, use: keyhole governed run --repo-dir examples/second-governed-app --json",
+                "For legacy first-app diagnostics, use: keyhole run --context auto --repo-dir my-first-app --json",
+            ],
         )
     except GovernedDemoError as exc:
         return _failure("keyhole context compile", exc)

@@ -150,6 +150,7 @@ class NegotiatedFeatures(BaseModel):
     def to_dict(self) -> Dict[str, bool]:
         """Return the features as a plain dict (§11 minimum local model shape)."""
         return {
+            "authenticated_identity": self.authenticated_identity,
             "run_dispatch": self.run_dispatch,
             "run_async_accept": self.run_async_accept,
             "context_compile": self.context_compile,

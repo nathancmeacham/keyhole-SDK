@@ -41,7 +41,7 @@ from keyhole_sdk.config import (
 from keyhole_sdk.transport.operation_registry import get_operation
 
 
-_EXPECTED_REALM = DEFAULT_REALM  # "keyhole-mcp"
+_EXPECTED_REALM = "keyhole-mcp"
 _EXPECTED_CLIENT_ID = DEFAULT_CLIENT_ID  # "keyhole-cli"
 _EXPECTED_HUMAN_REALM = "kh-prod"
 

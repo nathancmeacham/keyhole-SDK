@@ -1,0 +1,56 @@
+﻿# Repo Sanitation Report
+Audit Date: 2026-05-15
+
+## Private Path Leakage
+
+### /opt/keyhole_platform — 1 HIT
+File: packages/python/keyhole-sdk/keyhole_sdk/runtime_contract/builder.py:144
+Content: ".venv -> /opt/keyhole_platform/.venv"
+Classification: INTENTIONAL_TEST_FIXTURE
+Verdict: SAFE — This is the NEGATIVE PROOF test fixture used to validate that
+nonportable VM symlinks are REJECTED by the server. It is not a real path reference.
+The method is named build_nonportable_venv_context() and its docstring explicitly
+states it must be rejected by the server. No real dependency on /opt/keyhole_platform.
+
+### C:\Users\<redacted> — 0 HITS in source (outside evidence bundle)
+Classification: CLEAN
+
+### tenant-6f4f45b96f64 — 0 HITS outside remediation/evidence and proof_bundle
+Classification: CLEAN
+
+### c2a432d8 — 0 HITS outside remediation/evidence
+Classification: CLEAN
+
+### org-bf06d8b73238 — 0 HITS outside remediation/evidence
+Classification: CLEAN
+
+### workspaceStorage — 0 HITS in source
+Classification: CLEAN
+
+### DATABASE_URL / NEON_DATABASE — 0 HITS
+Classification: CLEAN
+
+### KUBECONFIG — 0 HITS in source
+Classification: CLEAN
+
+### Twilio / TWILIO — 0 HITS
+Classification: CLEAN
+
+### cohort-0 — evidence/proof files only
+Classification: CLEAN (evidence artifacts only, not in public source)
+
+### client_secret — 0 code hits; evidence doc has redacted placeholder only
+Classification: SAFE
+
+## Summary
+
+| Category | Result |
+|----------|--------|
+| Private operator paths in source | 1 (intentional test fixture — SAFE) |
+| Real credentials in source | 0 |
+| Tenant IDs in source | 0 |
+| Private user paths in source | 0 |
+| Internal service URLs in source | 0 |
+| Stale Twilio references | 0 |
+
+Overall: PASS with 1 noted item (safe — test fixture)

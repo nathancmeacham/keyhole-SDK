@@ -18,6 +18,7 @@ Mode is server-determined and client-read-only.
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -169,6 +170,15 @@ class AuthBootstrapClient:
                     on_status=on_status,
                 )
             elif flow_type == AuthFlowType.PASSWORD:
+                if os.environ.get("KEYHOLE_ENABLE_DEV_PASSWORD_LOGIN") != "1":
+                    raise AuthBootstrapError(
+                        "Password login is disabled in the public SDK by default.",
+                        reason="password_login_disabled",
+                        repair_suggestions=[
+                            "Use: keyhole login --flow device --force",
+                            "For local/dev only: set KEYHOLE_ENABLE_DEV_PASSWORD_LOGIN=1 and retry.",
+                        ],
+                    )
                 if not username or not password:
                     from keyhole_sdk.auth_bootstrap.errors import InvalidTokenError
                     raise InvalidTokenError(

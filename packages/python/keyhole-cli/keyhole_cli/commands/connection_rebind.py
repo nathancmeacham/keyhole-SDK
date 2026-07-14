@@ -1,4 +1,4 @@
-"""`keyhole connection rebind` — rebind connection to a profile (§9.4).
+"""`keyhole connection rebind` - rebind connection to a profile (section9.4).
 
 SDK-CLIENT-01-C: Explicit governed rebind of a live host connection
 to a different principal.
@@ -31,7 +31,7 @@ def run_connection_rebind(
     yes: bool = False,
     mcp_url: str = DEFAULT_BASE_URL,
 ) -> CommandResult:
-    """Rebind a connection to a target profile (§9.4).
+    """Rebind a connection to a target profile (section9.4).
 
     INV-SDK-CLIENT-01-C-004: Must verify post-fix against server truth.
     INV-SDK-CLIENT-01-C-006: Uses idempotent dispatch semantics.
@@ -146,7 +146,7 @@ def run_connection_rebind(
 
     is_success = outcome.status in (RebindStatus.ACCEPTED, RebindStatus.REBOUND, RebindStatus.REPLAYED)
 
-    # 5. Post-fix verification (§12.3, INV-SDK-CLIENT-01-C-004)
+    # 5. Post-fix verification (section12.3, INV-SDK-CLIENT-01-C-004)
     verification = {}
     if is_success:
         try:
@@ -180,10 +180,10 @@ def run_connection_rebind(
 
     # 7. Build result
     status_icons = {
-        RebindStatus.ACCEPTED: "✓",
-        RebindStatus.REBOUND: "✓",
+        RebindStatus.ACCEPTED: "OK",
+        RebindStatus.REBOUND: "OK",
         RebindStatus.REPLAYED: "↻",
-        RebindStatus.DEFERRED: "⏳",
+        RebindStatus.DEFERRED: "?",
         RebindStatus.REJECTED: "✗",
     }
     icon = status_icons.get(outcome.status, "?")
@@ -207,6 +207,6 @@ def run_connection_rebind(
             "verification": verification,
             "correlation_id": correlation_id,
         },
-        summary=f"{icon} Rebind {outcome.status.value}: {outcome.old_principal} → {outcome.new_principal}",
+        summary=f"{icon} Rebind {outcome.status.value}: {outcome.old_principal} -> {outcome.new_principal}",
         next_steps=next_steps,
     )

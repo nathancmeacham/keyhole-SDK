@@ -256,11 +256,24 @@ class CapabilitiesResult(BaseModel):
         directly when building the ``server_operations`` list for
         ``check_connection_surfaces_available()``.
         """
-        # Top-level operations list (may be empty on current server contract)
-        top_ops = [
-            op for op in self.raw.get("operations", [])
-            if isinstance(op, str) and op
-        ]
+        body = self.raw.get("data") if isinstance(self.raw.get("data"), dict) else self.raw
+        operations = body.get("operations", []) if isinstance(body, dict) else []
+        top_ops: List[str] = []
+        if isinstance(operations, list):
+            for op in operations:
+                if isinstance(op, str) and op:
+                    top_ops.append(op)
+                elif isinstance(op, dict):
+                    for key in ("operation_id", "name", "canonical_run_type"):
+                        value = op.get(key)
+                        if isinstance(value, str) and value:
+                            top_ops.append(value)
+                    aliases = op.get("aliases")
+                    if isinstance(aliases, list):
+                        top_ops.extend(alias for alias in aliases if isinstance(alias, str) and alias)
+        if isinstance(body, dict):
+            top_ops.extend(_extract_nested_run_types(body.get("governed_worker_sdk")))
+        top_ops.extend(self.get_implemented_context_surfaces())
         # Connection surface ops
         cs_ops = self.connection_surfaces.get_run_type_names()
         # Merge, deduplicate, preserve order
@@ -272,3 +285,20 @@ class CapabilitiesResult(BaseModel):
                 merged.append(op)
         return merged
 
+
+def _extract_nested_run_types(value: Any) -> List[str]:
+    """Collect run type declarations from nested governed-worker capabilities."""
+    found: List[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in {"run_type", "canonical_run_type", "compatibility_check_run_type"}:
+                if isinstance(item, str) and item:
+                    found.append(item)
+            elif key in {"logical_aliases", "aliases"} and isinstance(item, list):
+                found.extend(alias for alias in item if isinstance(alias, str) and alias)
+            else:
+                found.extend(_extract_nested_run_types(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.extend(_extract_nested_run_types(item))
+    return found

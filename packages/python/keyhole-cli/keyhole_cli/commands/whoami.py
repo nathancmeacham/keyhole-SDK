@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from keyhole_cli.result import CommandResult, EXIT_SUCCESS, EXIT_FAILURE
+from keyhole_sdk.auth_bootstrap.token_refresh import get_fresh_token
 from keyhole_sdk.auth_bootstrap.actor_envelope import ActorEnvelope
 from keyhole_sdk.auth_bootstrap.credential_store import CredentialStore
 from keyhole_sdk.auth_bootstrap.errors import AuthBootstrapError
@@ -51,23 +52,30 @@ def run_whoami(
             next_steps=["Run 'keyhole login' to authenticate."],
         )
 
+    access_token = session.access_token
     if session.is_expired:
-        return CommandResult(
-            command="whoami",
-            success=False,
-            exit_code=EXIT_FAILURE,
-            data={"expired": True},
-            summary="Session expired.",
-            next_steps=[
-                "Run 'keyhole login' to re-authenticate.",
-                "Run 'keyhole login --force' to force a fresh login.",
-            ],
-        )
+        try:
+            access_token = get_fresh_token()
+            refreshed = store.load()
+            if refreshed is not None:
+                session = refreshed
+        except Exception:
+            return CommandResult(
+                command="whoami",
+                success=False,
+                exit_code=EXIT_FAILURE,
+                data={"expired": True},
+                summary="Session expired and refresh failed.",
+                next_steps=[
+                    "Run 'keyhole login' to re-authenticate.",
+                    "Run 'keyhole login --force' to force a fresh login.",
+                ],
+            )
 
     # Call whoami
     client = WhoamiClient(mcp_base_url=mcp_base_url)
     try:
-        whoami = client.whoami(session.access_token)
+        whoami = client.whoami(access_token)
     except AuthBootstrapError as exc:
         return CommandResult(
             command="whoami",

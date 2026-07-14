@@ -48,8 +48,10 @@ def tail_run(
     terminal_status: Optional[RunStatus] = None
     last_status = ""
     interrupted = False
+    polls = 0
 
-    while len(entries) < max_entries:
+    while polls < max_entries:
+        polls += 1
         status_result = fetch_run_status(
             transport=transport,
             run_id=run_id,

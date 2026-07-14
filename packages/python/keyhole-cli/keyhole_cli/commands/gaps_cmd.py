@@ -20,6 +20,13 @@ from keyhole_sdk.auth import BearerTokenProvider
 from keyhole_sdk.auth_bootstrap.credential_store import CredentialStore
 from keyhole_sdk.auth_bootstrap.token_refresh import get_fresh_token
 from keyhole_sdk.context_lifecycle.compile import compile_context, build_compile_request
+from keyhole_sdk.gap_closure import (
+    GapClosureClient,
+    GapClosureError,
+    assert_closure_response_governed,
+    build_gap_closure_payload,
+    write_closure_artifact,
+)
 from keyhole_sdk.repo_identity import detect_repo_identity, RepoIdentityError
 from keyhole_sdk.run_dispatch.dispatcher import dispatch_run, OutcomeStatus
 from keyhole_sdk.run_dispatch.request_builder import build_run_request
@@ -46,7 +53,7 @@ def _build_transport(
     store_dir = Path(keyhole_home) if keyhole_home else None
     cred_store = CredentialStore(store_dir=store_dir)
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
         token = ""
     auth_provider = BearerTokenProvider(token=token) if token else None
@@ -424,3 +431,82 @@ def run_gaps_revalidate(
         keyhole_home=keyhole_home,
         repo_dir=repo_dir,
     )
+
+
+def run_gaps_close(
+    *,
+    gap_id: str,
+    closure_reason: str,
+    closure_classification: str,
+    evidence_bundle_hash: str,
+    repo_dir: str = ".",
+    mcp_url: str = DEFAULT_BASE_URL,
+    keyhole_home: str = "",
+    requested_by: str = "",
+    workspace_id: str = "",
+    governed_run_id: str = "",
+    receipt_id: str = "",
+    proof_id: str = "",
+) -> CommandResult:
+    """Execute ``keyhole gaps close`` through governed MCP closure."""
+    if not gap_id or not gap_id.strip():
+        return CommandResult(
+            command="keyhole gaps close",
+            success=False,
+            exit_code=EXIT_INVALID_INPUT,
+            summary="--gap-id is required.",
+        )
+    transport, cred_store = _build_transport(mcp_url, keyhole_home)
+    gate = _preflight_check(cred_store, "keyhole gaps close")
+    transport.close()
+    if gate is not None:
+        return gate
+    try:
+        token = getattr(transport.auth_provider, "token", "") if transport.auth_provider else ""
+        payload = build_gap_closure_payload(
+            repo_dir=repo_dir,
+            gap_id=gap_id.strip(),
+            closure_reason=closure_reason,
+            closure_classification=closure_classification,
+            evidence_bundle_hash=evidence_bundle_hash,
+            workspace_id=workspace_id,
+            requested_by=requested_by,
+            governed_run_id=governed_run_id,
+            receipt_id=receipt_id,
+            proof_id=proof_id,
+        )
+        client = GapClosureClient(mcp_url=mcp_url, token=token)
+        preflight = client.preflight(gap_id=payload.gap_id)
+        response = client.submit_closure(payload)
+        assert_closure_response_governed(response)
+        repo_path = Path(repo_dir).resolve()
+        state_dir = repo_path / ".keyhole" / "gap-closures" / payload.gap_id
+        write_closure_artifact(state_dir / "closure_request.json", payload.to_dict())
+        write_closure_artifact(state_dir / "server_preflight.json", preflight)
+        write_closure_artifact(state_dir / "closure_response.json", response)
+        return CommandResult(
+            command="keyhole gaps close",
+            success=True,
+            exit_code=EXIT_SUCCESS,
+            summary="Governed gap closure accepted by server.",
+            data={
+                "gap_id": payload.gap_id,
+                "closure_request": payload.to_dict(),
+                "server_preflight": preflight,
+                "closure_response": response,
+                "local_state_dir": str(state_dir),
+            },
+        )
+    except GapClosureError as exc:
+        return CommandResult(
+            command="keyhole gaps close",
+            success=False,
+            exit_code=EXIT_FAILURE,
+            summary=str(exc),
+            data={"error_class": "GapClosureError"},
+            next_steps=[
+                "Confirm /health/event-spine is PASS or PASS_WITH_LEGACY_WARNINGS.",
+                "Confirm the target gap is still OPEN with no closure lineage.",
+                "Do not treat local test success as closure without server close_verdict_ref.",
+            ],
+        )

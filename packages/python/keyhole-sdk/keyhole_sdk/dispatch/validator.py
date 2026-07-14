@@ -100,6 +100,13 @@ CANONICAL_RUN_TYPES: FrozenSet[str] = frozenset({
     "proof.bundle.emit",
     "proofbundle.build",
     "proofs.e2e.harness",
+    # Product envelope observability
+    "request.inspect",
+    "run.budget",
+    "run.explain",
+    "run.status",
+    "run.tail",
+    "support.bundle",
     # Readiness
     "readiness.explain",
     # Tools

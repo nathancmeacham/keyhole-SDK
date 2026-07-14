@@ -90,6 +90,7 @@ def classify_surfaces(
     """
     flags: Dict[str, bool] = dict(caps.features.flags)
     implemented = set(caps.context_access.implemented_surfaces)
+    operations = set(caps.get_all_run_types())
 
     # §8.1 Required: derive from structural endpoint declarations
     # authenticated_identity — identity endpoint declared
@@ -102,6 +103,7 @@ def classify_surfaces(
     # §8.2 Optional: prefer feature flags; check context surfaces as fallback
     has_context_compile = (
         _CONTEXT_COMPILE_KEY in implemented
+        or _CONTEXT_COMPILE_KEY in operations
         or bool(flags.get("context_compile", False))
     )
 

@@ -116,7 +116,7 @@ def run_repo_attach(
         )
 
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
         token = session.access_token
 

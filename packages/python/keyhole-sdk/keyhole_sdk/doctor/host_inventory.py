@@ -60,8 +60,6 @@ _VSCODE_SETTINGS_PATHS: List[str] = [
 _VSCODE_MCP_PATHS: List[str] = [
     "~/.config/Code/User/globalStorage/mcp.json",
     "~/.vscode-server/data/User/globalStorage/mcp.json",
-    # Workspace-level .vscode/mcp.json
-    ".vscode/mcp.json",
 ]
 
 _KEYHOLE_INDICATORS = ("keyhole", DEFAULT_BASE_URL)

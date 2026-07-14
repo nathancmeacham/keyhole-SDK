@@ -1,0 +1,11 @@
+﻿AUDIT DATE: 2026-05-15
+OS: Windows 11
+CWD: <local-checkout>
+PYTHON: Python 3.12.7
+PIP: pip 24.2 from <local-python-site-packages>\pip (python 3.12)
+VENV: editable installs (packages/python/keyhole-sdk, packages/python/keyhole-cli)
+
+KEYHOLE_* ENVIRONMENT VARIABLES:
+
+
+NOTE: No KEYHOLE_* vars set — all defaults used.

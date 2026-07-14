@@ -47,6 +47,7 @@ class RuntimeIdentity(BaseModel):
     runtime_version: str
     environment: str
     capabilities: List[str]
+    governance_mode: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod

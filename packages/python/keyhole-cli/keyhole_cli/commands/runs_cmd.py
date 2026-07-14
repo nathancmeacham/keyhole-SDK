@@ -91,12 +91,17 @@ def run_runs_status(
 
     data = {
         "run_id": result.run_id,
+        "request_id": result.request_id,
         "status": result.status.value,
         "is_terminal": result.status.is_terminal,
         "run_type": result.run_type,
         "repo": result.repo_name,
         "shadow": result.shadow,
+        "resolved": result.resolved,
+        "server_backed": result.server_backed,
     }
+    if result.correlation_id:
+        data["correlation_id"] = result.correlation_id
     if result.ctxpack_digest:
         data["ctxpack_digest"] = result.ctxpack_digest
     if result.last_updated:
@@ -445,7 +450,7 @@ def _build_transport(
     store_dir = Path(keyhole_home) if keyhole_home else None
     cred_store = CredentialStore(store_dir=store_dir)
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
         token = ""
     auth_provider = BearerTokenProvider(token=token) if token else None

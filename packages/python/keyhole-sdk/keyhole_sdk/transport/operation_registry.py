@@ -1,6 +1,6 @@
 """Central operation-class registry for SDK and CLI methods.
 
-SDK-CLIENT-15 §9 + §15.3: All public operations must belong to a declared
+SDK-CLIENT-15 section9 + section15.3: All public operations must belong to a declared
 operation class. The registry prevents route-by-route drift.
 """
 
@@ -12,7 +12,7 @@ from typing import Dict, Optional
 
 
 class OperationClass(enum.Enum):
-    """Classified operation types per §9."""
+    """Classified operation types per section9."""
 
     READ_ONLY = "READ_ONLY"
     WRITE_IDEMPOTENT_REQUIRED = "WRITE_IDEMPOTENT_REQUIRED"
@@ -21,7 +21,7 @@ class OperationClass(enum.Enum):
 
 
 class RetryPolicy(enum.Enum):
-    """Retry strategies per §12."""
+    """Retry strategies per section12."""
 
     SAFE_READ = "SAFE_READ"
     SAFE_WRITE_IDEMPOTENT = "SAFE_WRITE_IDEMPOTENT"
@@ -39,10 +39,10 @@ class OperationDescriptor:
     proof_required: bool = False
 
 
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 # Canonical Operation Registry
-# ══════════════════════════════════════════════════════════════
-# §15.3: Central registry mapping public methods/routes to
+# --------------------------------------------------------------
+# section15.3: Central registry mapping public methods/routes to
 # operation class, idempotency requirement, retry policy, proof.
 
 _REGISTRY: Dict[str, OperationDescriptor] = {}
@@ -74,12 +74,12 @@ def requires_idempotency(name: str) -> bool:
     return desc is not None and desc.idempotency_required
 
 
-# ══════════════════════════════════════════════════════════════
-# Built-in operation registrations — current SDK surface
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
+# Built-in operation registrations - current SDK surface
+# --------------------------------------------------------------
 
 _BUILTIN_OPERATIONS = [
-    # § 9.1 READ_ONLY — no idempotency key
+    # section 9.1 READ_ONLY - no idempotency key
     OperationDescriptor(
         name="capabilities",
         operation_class=OperationClass.READ_ONLY,
@@ -158,7 +158,7 @@ _BUILTIN_OPERATIONS = [
         retry_policy=RetryPolicy.SAFE_READ,
         idempotency_required=False,
     ),
-    # § 9.2 WRITE_IDEMPOTENT_REQUIRED — key required
+    # section 9.2 WRITE_IDEMPOTENT_REQUIRED - key required
     OperationDescriptor(
         name="register",
         operation_class=OperationClass.WRITE_IDEMPOTENT_REQUIRED,
@@ -194,7 +194,7 @@ _BUILTIN_OPERATIONS = [
         idempotency_required=True,
         proof_required=True,
     ),
-    # § SDK-CLIENT-08: Capability Discovery and Resolution
+    # section SDK-CLIENT-08: Capability Discovery and Resolution
     OperationDescriptor(
         name="capability.search",
         operation_class=OperationClass.READ_ONLY,
@@ -208,21 +208,21 @@ _BUILTIN_OPERATIONS = [
         idempotency_required=True,
         proof_required=True,
     ),
-    # § SDK-CLIENT-11: Alignment Guidance (READ_ONLY — advisory, no repo mutation)
+    # section SDK-CLIENT-11: Alignment Guidance (READ_ONLY - advisory, no repo mutation)
     OperationDescriptor(
         name="alignment.guidance",
         operation_class=OperationClass.READ_ONLY,
         retry_policy=RetryPolicy.SAFE_READ,
         idempotency_required=False,
     ),
-    # § SDK-CLIENT-19: Budget/limit visibility (READ_ONLY — inspection only)
+    # section SDK-CLIENT-19: Budget/limit visibility (READ_ONLY - inspection only)
     OperationDescriptor(
         name="run.budget",
         operation_class=OperationClass.READ_ONLY,
         retry_policy=RetryPolicy.SAFE_READ,
         idempotency_required=False,
     ),
-    # § SDK-CLIENT-20: Governance explainability (READ_ONLY — explain/inspect)
+    # section SDK-CLIENT-20: Governance explainability (READ_ONLY - explain/inspect)
     OperationDescriptor(
         name="run.explain",
         operation_class=OperationClass.READ_ONLY,
@@ -235,7 +235,7 @@ _BUILTIN_OPERATIONS = [
         retry_policy=RetryPolicy.SAFE_READ,
         idempotency_required=False,
     ),
-    # § SDK-CLIENT-22: Account deregistration (write, idempotent, proof-bearing)
+    # section SDK-CLIENT-22: Account deregistration (write, idempotent, proof-bearing)
     OperationDescriptor(
         name="auth.remove",
         operation_class=OperationClass.WRITE_IDEMPOTENT_REQUIRED,
@@ -243,7 +243,7 @@ _BUILTIN_OPERATIONS = [
         idempotency_required=True,
         proof_required=True,
     ),
-    # § SDK-CLIENT-24: Runtime contract verification — read-only discovery
+    # section SDK-CLIENT-24: Runtime contract verification - read-only discovery
     # and compatibility check exposed by SDK-SERVER-24.
     OperationDescriptor(
         name="sdk.runtime.surface.get.v1",
@@ -257,7 +257,7 @@ _BUILTIN_OPERATIONS = [
         retry_policy=RetryPolicy.SAFE_READ,
         idempotency_required=False,
     ),
-    # § 9.3 NATURALLY_CONVERGENT_EXEMPT — key recommended but not required
+    # section 9.3 NATURALLY_CONVERGENT_EXEMPT - key recommended but not required
     OperationDescriptor(
         name="verify",
         operation_class=OperationClass.NATURALLY_CONVERGENT_EXEMPT,

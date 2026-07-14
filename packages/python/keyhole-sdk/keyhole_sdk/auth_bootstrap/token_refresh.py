@@ -40,13 +40,17 @@ _DEFAULT_CLIENT_ID: str = "keyhole-cli"
 # Credential file helpers
 # ---------------------------------------------------------------------------
 
-def _cred_path() -> Path:
-    home = Path(os.environ.get("KEYHOLE_HOME", str(Path.home() / ".keyhole")))
+def _cred_path(keyhole_home: str | Path | None = None) -> Path:
+    home = (
+        Path(keyhole_home)
+        if keyhole_home
+        else Path(os.environ.get("KEYHOLE_HOME", str(Path.home() / ".keyhole")))
+    )
     return home / "credentials.json"
 
 
-def _load_creds() -> dict:
-    path = _cred_path()
+def _load_creds(keyhole_home: str | Path | None = None) -> dict:
+    path = _cred_path(keyhole_home)
     if not path.exists():
         raise FileNotFoundError(
             f"No Keyhole credentials found at {path}. "
@@ -55,9 +59,9 @@ def _load_creds() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _save_creds(creds: dict) -> None:
+def _save_creds(creds: dict, keyhole_home: str | Path | None = None) -> None:
     """Atomically write credentials (temp-rename, preserves 0600 mode)."""
-    path = _cred_path()
+    path = _cred_path(keyhole_home)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(creds, indent=2), encoding="utf-8")
     tmp.chmod(0o600)
@@ -128,10 +132,11 @@ def _do_refresh(creds: dict) -> dict:
 # Public API
 # ---------------------------------------------------------------------------
 
-def get_fresh_token() -> str:
+def get_fresh_token(keyhole_home: str | Path | None = None) -> str:
     """Return a valid bearer token, refreshing transparently if near-expiry.
 
-    1. Reads ``~/.keyhole/credentials.json`` (or ``$KEYHOLE_HOME/credentials.json``).
+    1. Reads ``~/.keyhole/credentials.json`` (or the supplied ``keyhole_home``
+       / ``$KEYHOLE_HOME`` credentials file).
     2. If the stored access token has > ``_EXPIRY_BUFFER_SECONDS`` of life left,
        returns it immediately without any network call.
     3. Otherwise uses the stored ``refresh_token`` to obtain a new access token
@@ -144,7 +149,7 @@ def get_fresh_token() -> str:
         requests.HTTPError: if the refresh grant call fails (e.g. refresh token
             revoked — user must ``keyhole login`` again).
     """
-    creds = _load_creds()
+    creds = _load_creds(keyhole_home)
     access_token: str = creds.get("access_token", "")
 
     if _token_is_valid(access_token):
@@ -158,5 +163,5 @@ def get_fresh_token() -> str:
         )
 
     creds = _do_refresh(creds)
-    _save_creds(creds)
+    _save_creds(creds, keyhole_home)
     return creds["access_token"]

@@ -356,7 +356,7 @@ def _build_transport(
     store_dir = Path(keyhole_home) if keyhole_home else None
     cred_store = CredentialStore(store_dir=store_dir)
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
         token = ""
     auth_provider = BearerTokenProvider(token=token) if token else None

@@ -4,8 +4,8 @@
       Reject invalid syntax, report exact file/field path, distinguish
       missing vs malformed vs empty.
 
-pyyaml is a soft dependency — not in pyproject.toml. We lazy-import it
-and fall back with a clear install instruction if unavailable.
+PyYAML is a declared SDK dependency. We still lazy-import it so direct source
+checkout failures produce a clear install instruction instead of a traceback.
 """
 
 from __future__ import annotations

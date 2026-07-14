@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterable, Optional
 import requests
 
 from keyhole_sdk.models import GovernanceReceipt
+from keyhole_sdk.transport.idempotency import generate_idempotency_key, generate_request_id
 
 
 REDACTED = "<redacted>"
@@ -33,6 +34,18 @@ STORY_ID = "CE-V5-S51-C02"
 GAP_ID_OVERRIDE_ENV = "KEYHOLE_C02_GAP_ID"
 ASYNC_TERMINAL_STATUSES = {"completed", "succeeded", "success", "failed", "canceled", "cancelled", "timed_out"}
 ASYNC_ACTIVE_STATUSES = {"accepted", "queued", "pending", "running", "started"}
+CLAIMABLE_GAP_STATUSES = {"open", "claimable", "actionable"}
+NON_CLAIMABLE_GAP_STATUSES = {
+    "archived",
+    "blocked",
+    "cancelled",
+    "canceled",
+    "closed",
+    "done",
+    "rejected",
+    "resolved",
+    "stale",
+}
 
 
 class GovernedDemoError(RuntimeError):
@@ -141,7 +154,7 @@ class GovernedFirstAppClient:
         response = self.session.request(
             op.method,
             f"{self.mcp_url}{op.path}",
-            headers=self._headers(),
+            headers=self._headers(idempotent=True),
             json=payload,
             timeout=self.timeout,
         )
@@ -184,6 +197,7 @@ class GovernedFirstAppClient:
             "run_type": op.run_type,
             "claim_id": claim.get("claim_id", ""),
             "claim_ref": claim.get("claim_ref", ""),
+            "claim_ctxpack_digest": claim.get("ctxpack_digest", ""),
             "gap_id": claim.get("gap_id", self.story_id),
             "story_id": self.story_id,
             "gap_id_source": self.gap_id_source,
@@ -197,7 +211,7 @@ class GovernedFirstAppClient:
         op = self._require_operation("gaps.claim")
         repo = Path(repo_path).resolve()
         metadata = _repo_git_metadata(repo)
-        ctxpack_digest = self._compile_preclaim_context(repo)
+        ctxpack_digest = self._claim_context_digest(repo)
         gap_id = self._resolve_gap_id(repo)
         payload = {
             "run_type": op.run_type or "gaps.claim",
@@ -215,7 +229,7 @@ class GovernedFirstAppClient:
         response = self.session.request(
             op.method,
             f"{self.mcp_url}{op.path}",
-            headers=self._headers(),
+            headers=self._headers(idempotent=True),
             json=payload,
             timeout=self.timeout,
         )
@@ -232,6 +246,7 @@ class GovernedFirstAppClient:
             "claim_ref": claim_ref,
             "gap_id": gap_id,
             "gap_id_source": self.gap_id_source,
+            "ctxpack_digest": ctxpack_digest,
             "upstream": _redact(data),
         }
 
@@ -274,13 +289,25 @@ class GovernedFirstAppClient:
             "capability": self.capability_id,
             "fingerprint_version": "sdk-v1",
         }
-        discovered = self._run_gap_discovery(op, params, repo)
+        discovery_error: Optional[GovernedDemoError] = None
+        try:
+            discovered = self._run_gap_discovery(op, params, repo)
+        except GovernedDemoError as exc:
+            if not self.story_id:
+                raise
+            discovery_error = exc
+            discovered = ""
         if discovered:
             return discovered
         if self.story_id:
             fallback_params = dict(params)
             fallback_params.pop("story_id", None)
-            return self._run_gap_discovery(op, fallback_params, repo)
+            try:
+                return self._run_gap_discovery(op, fallback_params, repo)
+            except GovernedDemoError:
+                if discovery_error is not None:
+                    raise discovery_error
+                raise
         return ""
 
     def _run_gap_discovery(self, op: BoundaryOperation, params: Dict[str, Any], repo: Path) -> str:
@@ -314,7 +341,7 @@ class GovernedFirstAppClient:
         response = self.session.request(
             op.method,
             f"{self.mcp_url}{op.path}",
-            headers=self._headers(),
+            headers=self._headers(idempotent=True),
             json=payload,
             timeout=self.timeout,
         )
@@ -326,6 +353,35 @@ class GovernedFirstAppClient:
         if not context_id:
             raise GovernedDemoError("pre-claim context.compile response missing ctxpack digest.")
         return context_id
+
+    def _claim_context_digest(self, repo: Path) -> str:
+        canonical = self._current_canonical_digest(repo)
+        if canonical:
+            return canonical
+        return self._compile_preclaim_context(repo)
+
+    def _current_canonical_digest(self, repo: Path) -> str:
+        payload = {
+            "run_type": "gaps.status",
+            "repo": repo.name,
+            "shadow": False,
+        }
+        try:
+            response = self.session.request(
+                "POST",
+                f"{self.mcp_url}/mcp/v1/runs/start",
+                headers=self._headers(),
+                json=payload,
+                timeout=self.timeout,
+            )
+            if response.status_code >= 400:
+                return ""
+            data = _json_object(response)
+            if data.get("ok") is False:
+                return ""
+            return _extract_current_canonical_digest(data)
+        except Exception:
+            return ""
 
     def compile_context(self, repo_path: str | Path) -> Dict[str, Any]:
         self._ensure_discovered()
@@ -341,10 +397,19 @@ class GovernedFirstAppClient:
                 "story_id": self.story_id,
             },
         }
+        context_ref = _first_string(
+            registration.get("claim_ctxpack_digest"),
+            registration.get("ctxpack_digest"),
+            self._current_canonical_digest(repo),
+        )
+        if context_ref:
+            payload["ctxpack_digest"] = context_ref
+            payload["context_ref"] = context_ref
+            payload["params"]["ctxpack_digest"] = context_ref
         response = self.session.request(
             op.method,
             f"{self.mcp_url}{op.path}",
-            headers=self._headers(),
+            headers=self._headers(idempotent=True),
             json=payload,
             timeout=self.timeout,
         )
@@ -353,10 +418,12 @@ class GovernedFirstAppClient:
         _raise_for_mcp_error(data, "context compile")
         data = self._resolve_async_result(data, "context compile")
         context_id = _extract_context_id(data)
+        ctxpack_digest = _extract_context_digest(data) or context_id
         if not context_id:
             raise GovernedDemoError("context.compile response missing governance_context_id or context digest.")
         state = {
             "governance_context_id": context_id,
+            "ctxpack_digest": ctxpack_digest,
             "repo": repo.name,
             "registration_id": registration.get("registration_id", ""),
             "boundary_operation": "context.compile",
@@ -371,6 +438,11 @@ class GovernedFirstAppClient:
         context = _read_state(repo, CONTEXT_STATE)
         local_invariant = _run_local_invariant(repo, self.capability_id)
         candidate_digest = _candidate_digest(repo, local_invariant, context)
+        context_ref = _first_string(
+            _valid_ctxpack_digest(context.get("ctxpack_digest")),
+            _extract_context_digest(context.get("upstream") if isinstance(context.get("upstream"), dict) else {}),
+            _valid_ctxpack_digest(context.get("governance_context_id")),
+        )
         op = self._require_operation("governed.realize")
         request = {
             "run_type": op.run_type or "governed.realize",
@@ -381,6 +453,9 @@ class GovernedFirstAppClient:
                 "local_invariant_result": local_invariant,
             },
         }
+        if context_ref:
+            request["ctxpack_digest"] = context_ref
+            request["context_ref"] = context_ref
         if op.surface == "runtime":
             runtime_request = dict(request["params"])
             response = self.session.post(
@@ -392,7 +467,7 @@ class GovernedFirstAppClient:
             response = self.session.request(
                 op.method,
                 f"{self.mcp_url}{op.path}",
-                headers=self._headers(),
+                headers=self._headers(idempotent=True),
                 json=request,
                 timeout=self.timeout,
             )
@@ -405,11 +480,15 @@ class GovernedFirstAppClient:
         _write_state(repo, RECEIPT_STATE, _redact(receipt.model_dump(mode="json")))
         return receipt
 
-    def _headers(self) -> Dict[str, str]:
-        return {
+    def _headers(self, *, idempotent: bool = False) -> Dict[str, str]:
+        headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+        if idempotent:
+            headers["X-Idempotency-Key"] = generate_idempotency_key()
+            headers["X-Request-Id"] = generate_request_id()
+        return headers
 
     def _ensure_discovered(self) -> None:
         if not self.operations:
@@ -693,14 +772,117 @@ def _select_gap_id(data: Dict[str, Any], repo_name: str, story_id: str = "", cap
         return value
 
     ranked = sorted(gaps, key=score, reverse=True)
+    ranked = [gap for gap in ranked if score(gap) > 0]
+    if not ranked:
+        return ""
+    claimable = [gap for gap in ranked if _is_claimable_gap(gap)]
+    if not claimable:
+        raise GovernedDemoError(_no_claimable_gap_message(ranked[0]))
+    ranked = claimable
     best = ranked[0]
     best_score = score(best)
-    if best_score <= 0:
-        return ""
     tied = [gap for gap in ranked if score(gap) == best_score]
     if len(tied) > 1:
         raise GovernedDemoError("MULTIPLE_GAP_CANDIDATES: server returned multiple equally ranked canonical gaps.")
     return _first_string(best.get("gap_id"), best.get("id"))
+
+
+def _is_claimable_gap(gap: Dict[str, Any]) -> bool:
+    if _truthy(gap.get("blocked")):
+        return False
+    if _has_blocked_reasons(gap):
+        return False
+    claimable = gap.get("claimable")
+    if _truthy(claimable):
+        return True
+    if _falsey(claimable):
+        return False
+    status = str(gap.get("status") or gap.get("state") or "").lower()
+    if status in NON_CLAIMABLE_GAP_STATUSES:
+        return False
+    return status in CLAIMABLE_GAP_STATUSES
+
+
+def _no_claimable_gap_message(gap: Dict[str, Any]) -> str:
+    blocked_reasons = _summarize_blocked_reasons(gap.get("blocked_reasons"))
+    required_action = _summarize_required_action(gap.get("blocked_reasons"))
+    parts = [
+        "NO_CLAIMABLE_GAP: gaps.list returned matching gaps but none are claimable.",
+        f"best_gap_id={_first_string(gap.get('gap_id'), gap.get('id')) or '<unknown>'}",
+        f"status={_first_string(gap.get('status'), gap.get('state')) or '<unknown>'}",
+        f"claimable={_display_bool(gap.get('claimable'))}",
+        f"blocked={_display_bool(gap.get('blocked'))}",
+    ]
+    if blocked_reasons:
+        parts.append(f"blocked_reasons={blocked_reasons}")
+    if required_action:
+        parts.append(f"required_action={required_action}")
+    parts.append("Run 'keyhole gaps list --json' and make the gap OPEN/claimable before running governed realization.")
+    return " ".join(parts)
+
+
+def _has_blocked_reasons(gap: Dict[str, Any]) -> bool:
+    reasons = gap.get("blocked_reasons")
+    if isinstance(reasons, list):
+        return any(bool(item) for item in reasons)
+    if isinstance(reasons, dict):
+        return bool(reasons)
+    if isinstance(reasons, str):
+        return bool(reasons.strip())
+    return False
+
+
+def _summarize_blocked_reasons(reasons: Any) -> str:
+    if isinstance(reasons, list):
+        labels = []
+        for item in reasons:
+            if isinstance(item, dict):
+                labels.append(_first_string(item.get("code"), item.get("reason"), item.get("message")))
+            elif item:
+                labels.append(str(item))
+        return ",".join(label for label in labels if label)
+    if isinstance(reasons, dict):
+        return _first_string(reasons.get("code"), reasons.get("reason"), reasons.get("message"))
+    if isinstance(reasons, str):
+        return reasons.strip()
+    return ""
+
+
+def _summarize_required_action(reasons: Any) -> str:
+    items = reasons if isinstance(reasons, list) else [reasons]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        required = item.get("required_action")
+        if isinstance(required, dict):
+            return _first_string(required.get("type"), required.get("action"), required.get("message"))
+        if isinstance(required, str):
+            return required
+    return ""
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return False
+
+
+def _falsey(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value is False
+    if isinstance(value, str):
+        return value.strip().lower() in {"0", "false", "no", "n"}
+    return False
+
+
+def _display_bool(value: Any) -> str:
+    if _truthy(value):
+        return "true"
+    if _falsey(value):
+        return "false"
+    return "<unknown>"
 
 
 def _iter_gap_objects(value: Any) -> Iterable[Dict[str, Any]]:
@@ -767,10 +949,16 @@ def _build_repo_registration_payload(
             params["claim_id"] = claim["claim_id"]
         if claim.get("claim_ref"):
             params["claim_ref"] = claim["claim_ref"]
-    return {
-            "run_type": op.run_type,
-            "params": params,
-        }
+    context_ref = str((claim or {}).get("ctxpack_digest") or "")
+    payload = {
+        "run_type": op.run_type,
+        "params": params,
+    }
+    if context_ref:
+        params["ctxpack_digest"] = context_ref
+        payload["ctxpack_digest"] = context_ref
+        payload["context_ref"] = context_ref
+    return payload
 
 
 def _repo_git_metadata(repo: Path) -> Dict[str, str]:
@@ -1118,6 +1306,50 @@ def _extract_context_id(data: Dict[str, Any]) -> str:
     )
 
 
+def _extract_context_digest(data: Dict[str, Any]) -> str:
+    result = data.get("result") if isinstance(data.get("result"), dict) else {}
+    inner = data.get("data") if isinstance(data.get("data"), dict) else {}
+    keyhole = data.get("keyhole") if isinstance(data.get("keyhole"), dict) else {}
+    run = inner.get("run") if isinstance(inner.get("run"), dict) else {}
+    run_result = run.get("result") if isinstance(run.get("result"), dict) else {}
+    nested_result = inner.get("result") if isinstance(inner.get("result"), dict) else {}
+    output = inner.get("output") if isinstance(inner.get("output"), dict) else {}
+    context_card = run_result.get("context_card") if isinstance(run_result.get("context_card"), dict) else {}
+    determinism = context_card.get("determinism") if isinstance(context_card.get("determinism"), dict) else {}
+    return _first_valid_ctxpack_digest(
+        data.get("ctxpack_digest"),
+        data.get("digest"),
+        data.get("ctx_ref_sha256"),
+        result.get("ctxpack_digest"),
+        inner.get("ctxpack_digest"),
+        nested_result.get("ctxpack_digest"),
+        output.get("ctxpack_digest"),
+        run_result.get("ctxpack_digest"),
+        run_result.get("ctx_ref_sha256"),
+        determinism.get("digest"),
+        keyhole.get("ctx_ref_sha256"),
+    )
+
+
+def _first_valid_ctxpack_digest(*values: Any) -> str:
+    for value in values:
+        digest = _valid_ctxpack_digest(value)
+        if digest:
+            return digest
+    return ""
+
+
+def _valid_ctxpack_digest(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if text.startswith("sha256:"):
+        text = text[len("sha256:"):]
+    if len(text) == 64 and all(ch in "0123456789abcdefABCDEF" for ch in text):
+        return text
+    return ""
+
+
 def _extract_claim_id(data: Dict[str, Any]) -> str:
     result = data.get("result") if isinstance(data.get("result"), dict) else {}
     inner = data.get("data") if isinstance(data.get("data"), dict) else {}
@@ -1164,6 +1396,50 @@ def _first_bool(*values: Any) -> bool:
     return False
 
 
+def _extract_current_canonical_digest(data: Dict[str, Any]) -> str:
+    sections = [data]
+    for key in ("data", "result"):
+        child = data.get(key)
+        if isinstance(child, dict):
+            sections.append(child)
+            nested = child.get("result")
+            if isinstance(nested, dict):
+                sections.append(nested)
+
+    candidates = []
+    for section in sections:
+        canonical = section.get("canonical") if isinstance(section.get("canonical"), dict) else {}
+        candidates.extend([
+            canonical.get("current_canonical_digest"),
+            section.get("current_canonical_digest"),
+        ])
+    raw = _first_string(*candidates).strip()
+    if raw.startswith("sha256:"):
+        raw = raw[len("sha256:"):]
+    return raw
+
+
+def _error_detail(body: Dict[str, Any]) -> str:
+    candidates = [
+        body.get("reason"),
+        body.get("message"),
+        body.get("detail"),
+    ]
+    error = body.get("error") if isinstance(body.get("error"), dict) else {}
+    candidates.extend([
+        error.get("reason"),
+        error.get("message"),
+        error.get("detail"),
+        error.get("code"),
+    ])
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+        if isinstance(candidate, (dict, list)) and candidate:
+            return json.dumps(_redact(candidate), sort_keys=True, separators=(",", ":"))[:500]
+    return json.dumps(_redact(body), sort_keys=True, separators=(",", ":"))[:500]
+
+
 def _json_object(response: requests.Response) -> Dict[str, Any]:
     data = response.json()
     if not isinstance(data, dict):
@@ -1173,11 +1449,11 @@ def _json_object(response: requests.Response) -> Dict[str, Any]:
 
 def _raise_for_response(response: requests.Response, action: str) -> None:
     if response.status_code >= 400:
-        detail = ""
+        detail = response.text[:500]
         try:
             body = response.json()
             if isinstance(body, dict):
-                detail = str(body.get("reason") or body.get("message") or body.get("detail") or "")
+                detail = _error_detail(body)
         except ValueError:
             detail = response.text[:200]
         raise GovernedDemoError(f"{action} failed with HTTP {response.status_code}: {detail}")

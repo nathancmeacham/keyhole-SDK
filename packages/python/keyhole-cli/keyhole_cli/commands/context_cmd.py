@@ -187,9 +187,9 @@ def run_context_inspect(
     # ── Resolve identity ──
     session = cred_store.load()
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
-        token = ""
+        token = session.access_token if session else ""
 
     # ── Resolve repo name ──
     run_preflight = RunPreflight(credential_store=cred_store)

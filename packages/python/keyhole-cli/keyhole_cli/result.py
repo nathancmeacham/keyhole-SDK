@@ -15,9 +15,9 @@ from typing import Any, Dict, List, Optional
 import typer
 
 
-# ──────────────────────────────────────────────────────────────
-# Exit codes — deterministic and documented
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
+# Exit codes - deterministic and documented
+# --------------------------------------------------------------
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 EXIT_UNSUPPORTED = 2
@@ -85,7 +85,7 @@ def emit(result: CommandResult, *, use_json: bool) -> None:
 
 def _render_human(result: CommandResult) -> None:
     """Write a concise human-readable summary to stdout."""
-    ok = _glyph("✓", "OK") if result.success else _glyph("✗", "ERROR")
+    ok = _glyph("OK", "OK") if result.success else _glyph("✗", "ERROR")
     color = typer.colors.GREEN if result.success else typer.colors.RED
     typer.secho(f"{ok} {result.command}", fg=color, bold=True)
 
@@ -97,7 +97,7 @@ def _render_human(result: CommandResult) -> None:
             continue  # skip complex sub-structures in human view
         typer.echo(f"  {key}: {value}")
 
-    # SDK-CLIENT-23 §E: Render host identity coherence section loudly
+    # SDK-CLIENT-23 sectionE: Render host identity coherence section loudly
     hc = result.data.get("host_coherence")
     if hc:
         _render_host_coherence(hc)
@@ -110,7 +110,7 @@ def _render_human(result: CommandResult) -> None:
     if result.next_steps:
         typer.echo("  Next steps:")
         for s in result.next_steps:
-            typer.echo(f"    {_glyph('→', '->')} {s}")
+            typer.echo(f"    {_glyph('->', '->')} {s}")
 
 
 def _glyph(preferred: str, fallback: str) -> str:
@@ -123,9 +123,9 @@ def _glyph(preferred: str, fallback: str) -> str:
     return preferred
 
 
-# ──────────────────────────────────────────────────────────────
-# SDK-CLIENT-23 §E: Structured host identity coherence rendering
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
+# SDK-CLIENT-23 sectionE: Structured host identity coherence rendering
+# --------------------------------------------------------------
 
 _VERDICT_COLORS = {
     "ACCEPT_MATCH": typer.colors.GREEN,
@@ -140,19 +140,19 @@ _VERDICT_COLORS = {
 def _render_host_coherence(hc: Dict[str, Any]) -> None:
     """Render the host identity coherence section for human output.
 
-    Must be noisy, structured, and prescriptive per SDK-CLIENT-23 §E/H.
+    Must be noisy, structured, and prescriptive per SDK-CLIENT-23 sectionE/H.
     """
     typer.echo("")
     typer.secho(
-        "  ┌─────────────────────────────────────────────┐",
+        "  -----------------------------------------------",
         fg=typer.colors.CYAN,
     )
     typer.secho(
-        "  │         Host Identity Coherence              │",
+        "  -         Host Identity Coherence              -",
         fg=typer.colors.CYAN,
     )
     typer.secho(
-        "  └─────────────────────────────────────────────┘",
+        "  -----------------------------------------------",
         fg=typer.colors.CYAN,
     )
 
@@ -188,13 +188,13 @@ def _render_host_coherence(hc: Dict[str, Any]) -> None:
         typer.echo(f"    principal               : {cli_principal}")
     elif hc.get("cli_credentials_exist"):
         typer.secho(
-            "    principal               : (credentials exist — run 'keyhole whoami' to verify)",
+            "    principal               : (credentials exist - run 'keyhole whoami' to verify)",
             fg=typer.colors.YELLOW,
         )
     else:
-        typer.secho("    principal               : (none — not logged in)", fg=typer.colors.YELLOW)
+        typer.secho("    principal               : (none - not logged in)", fg=typer.colors.YELLOW)
 
-    # Verdict — loud and colored
+    # Verdict - loud and colored
     verdict = hc.get("verdict", "UNKNOWN")
     v_color = _VERDICT_COLORS.get(verdict, typer.colors.WHITE)
     description = hc.get("description", "")
@@ -219,7 +219,7 @@ def _render_host_coherence(hc: Dict[str, Any]) -> None:
     if hc.get("has_override"):
         typer.secho("    override: active (split-identity allowed)", fg=typer.colors.YELLOW)
 
-    # Fix steps — prescriptive and numbered
+    # Fix steps - prescriptive and numbered
     fix_steps = hc.get("fix_steps", [])
     if fix_steps:
         typer.echo("")

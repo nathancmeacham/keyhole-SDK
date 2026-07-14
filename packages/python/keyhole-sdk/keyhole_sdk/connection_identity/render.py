@@ -1,4 +1,4 @@
-"""SDK-CLIENT-01-C — Connection identity rendering helpers (§9, §13).
+"""SDK-CLIENT-01-C - Connection identity rendering helpers (section9, section13).
 
 Provides human-readable and machine-readable rendering for
 connection identity inspection, rebind, and invalidate results.
@@ -15,7 +15,7 @@ from keyhole_sdk.connection_identity.models import (
 
 
 def render_connection_info(info: ConnectionInfo) -> str:
-    """Render a single ConnectionInfo as a human-readable block (§9.3)."""
+    """Render a single ConnectionInfo as a human-readable block (section9.3)."""
     lines = []
     if info.host_hint:
         lines.append(f"Host:       {info.host_hint}")
@@ -38,7 +38,7 @@ def render_connection_info(info: ConnectionInfo) -> str:
 
 
 def render_connection_list(connections: List[ConnectionInfo]) -> str:
-    """Render a list of connections as a human-readable table (§9.2)."""
+    """Render a list of connections as a human-readable table (section9.2)."""
     if not connections:
         return "No connections visible."
 
@@ -55,12 +55,12 @@ def render_connection_list(connections: List[ConnectionInfo]) -> str:
 
 
 def render_rebind_outcome(outcome: RebindOutcome) -> str:
-    """Render a rebind outcome as human-readable text (§13.5)."""
+    """Render a rebind outcome as human-readable text (section13.5)."""
     status_icons = {
-        "accepted": "✓",
-        "rebound": "✓",
+        "accepted": "OK",
+        "rebound": "OK",
         "replayed": "↻",
-        "deferred": "⏳",
+        "deferred": "?",
         "rejected": "✗",
     }
     icon = status_icons.get(outcome.status.value, "?")
@@ -84,9 +84,9 @@ def render_rebind_outcome(outcome: RebindOutcome) -> str:
 
 
 def render_invalidate_outcome(outcome: InvalidateOutcome) -> str:
-    """Render an invalidate outcome as human-readable text (§13.6)."""
+    """Render an invalidate outcome as human-readable text (section13.6)."""
     status_icons = {
-        "accepted": "✓",
+        "accepted": "OK",
         "already_invalidated": "↻",
         "rejected": "✗",
     }
@@ -108,7 +108,7 @@ def render_invalidate_outcome(outcome: InvalidateOutcome) -> str:
 
 
 def render_lineage(lineage_data: Dict[str, Any]) -> str:
-    """Render connection lineage data as human-readable text (§9.4)."""
+    """Render connection lineage data as human-readable text (section9.4)."""
     if not lineage_data:
         return "No lineage data available."
 

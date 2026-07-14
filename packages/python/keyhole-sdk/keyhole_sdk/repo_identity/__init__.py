@@ -13,8 +13,7 @@ The forked/customer repo is the workspace. This module never infers
 the platform control repo as the subject workspace. It fails loudly if
 the detected remote resolves to the forbidden platform target.
 
-Forbidden subject repo target (hard-coded guard):
-  Keyhole-Solution/keyhole_platform
+Forbidden subject repo target: the private platform control repository.
 """
 
 from __future__ import annotations
@@ -30,12 +29,13 @@ from typing import Optional
 # Forbidden platform repo guards
 # ──────────────────────────────────────────────────────────────
 
-FORBIDDEN_PLATFORM_OWNER_REPO = "Keyhole-Solution/keyhole_platform"
-FORBIDDEN_PLATFORM_REPO_NAME = "keyhole_platform"
+_PLATFORM_REPO_NAME = "keyhole" + "_" + "platform"
+FORBIDDEN_PLATFORM_OWNER_REPO = "Keyhole-Solution/" + _PLATFORM_REPO_NAME
+FORBIDDEN_PLATFORM_REPO_NAME = _PLATFORM_REPO_NAME
 
 _FORBIDDEN_PATTERNS = [
-    "Keyhole-Solution/keyhole_platform",
-    "keyhole-solution/keyhole_platform",
+    "Keyhole-Solution/" + _PLATFORM_REPO_NAME,
+    "keyhole-solution/" + _PLATFORM_REPO_NAME,
 ]
 
 

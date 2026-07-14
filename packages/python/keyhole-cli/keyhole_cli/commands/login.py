@@ -74,7 +74,7 @@ def _auto_detect_flow(
             typer.echo(
                 f"\nPrior session used passwordless login. "
                 f"Re-using passwordless flow for {recovered_email}.\n"
-                f"  (Override with: keyhole login --flow pkce)\n",
+                f"  (Override with: keyhole login --flow device)\n",
                 err=True,
             )
             return AuthFlowType.PASSWORDLESS, recovered_email
@@ -82,7 +82,7 @@ def _auto_detect_flow(
             typer.echo(
                 "\nPrior session used passwordless login but no email is available.\n"
                 "  Use: keyhole login --flow passwordless --email you@example.com\n"
-                "  Or:  keyhole login --flow pkce  (for browser-based login)\n",
+                "  Or:  keyhole login --flow device  (for device authorization)\n",
                 err=True,
             )
 
@@ -139,7 +139,7 @@ def _resolve_proof_dir() -> "Path":
 
 def run_login(
     *,
-    flow: str = "pkce",
+    flow: str = "device",
     force: bool = False,
     auth_server_url: str = DEFAULT_AUTH_SERVER,
     client_id: str = "keyhole-cli",
@@ -165,7 +165,7 @@ def run_login(
             exit_code=EXIT_FAILURE,
             data={"error_class": "invalid_flow_type", "flow": flow},
             summary=f"Unknown flow type: {flow}. Use 'pkce', 'device', 'password', or 'passwordless'.",
-            next_steps=["Use: keyhole login --flow pkce", "Or: keyhole login --flow passwordless --email you@example.com"],
+            next_steps=["Use: keyhole login --flow device", "Or: keyhole login --flow passwordless --email you@example.com"],
         )
 
     proof.record_event("login_initiated", {
@@ -180,11 +180,10 @@ def run_login(
         mcp_base_url=mcp_base_url,
     )
 
-    # ── Smart flow auto-detection ──
+    # Smart flow auto-detection:
     # When the user didn't explicitly choose a flow and expired credentials
-    # exist from a prior passwordless login, re-use passwordless + email
-    # instead of opening a Keycloak browser form they can't complete.
-    if not _flow_explicit and flow_type == AuthFlowType.PKCE:
+    # exist from a prior passwordless login, re-use passwordless + email.
+    if not _flow_explicit and flow_type == AuthFlowType.DEVICE:
         flow_type, email = _auto_detect_flow(client, flow_type, email)
 
     status_messages: list[str] = []

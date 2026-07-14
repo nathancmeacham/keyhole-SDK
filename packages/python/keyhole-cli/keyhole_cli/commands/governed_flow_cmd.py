@@ -235,14 +235,23 @@ def _token() -> str:
 
 
 def _failure(command: str, exc: Exception, *, is_local: bool = False) -> CommandResult:
+    message = str(exc)
+    if "NO_CLAIMABLE_GAP" in message or "STATUS_NOT_CLAIMABLE" in message:
+        next_steps = [
+            "Run keyhole gaps list --repo-dir <path> --json and confirm at least one matching gap is claimable=true.",
+            "Ask the server boundary to materialize or reopen an OPEN gap for this repo/capability/current commit.",
+            "Use keyhole governed status --repo-dir <path> --last --json to inspect preserved local state.",
+        ]
+    else:
+        next_steps = [
+            "Run keyhole login --flow device --force if live MCP credentials are missing.",
+            "Use keyhole governed status --repo-dir <path> --last --json to inspect saved state.",
+        ]
     return CommandResult(
         command=command,
         success=False,
         exit_code=EXIT_FAILURE,
-        summary=str(exc),
+        summary=message,
         data={"error_class": type(exc).__name__, "is_local": is_local},
-        next_steps=[
-            "Run keyhole login --flow device --force if live MCP credentials are missing.",
-            "Use keyhole governed status --repo-dir <path> --last --json to inspect saved state.",
-        ],
+        next_steps=next_steps,
     )

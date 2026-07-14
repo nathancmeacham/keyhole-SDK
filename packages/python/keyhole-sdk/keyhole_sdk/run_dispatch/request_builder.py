@@ -36,6 +36,7 @@ class RunRequest:
         }
         if self.context_ref:
             payload["ctxpack_digest"] = self.context_ref
+            payload["context_ref"] = self.context_ref
         if self.input_data:
             payload["input"] = self.input_data
         if self.correlation_id:

@@ -61,7 +61,7 @@ def negotiate(caps: CapabilitiesResult) -> NegotiationResult:
     return NegotiationResult(
         server_version=caps.get_contract_version(),
         surface_fingerprint=caps.metadata.digest,
-        operations=list(caps.get_implemented_context_surfaces()),
+        operations=caps.get_all_run_types(),
         features=features,
         compatibility=CompatibilitySummary(
             status=status,

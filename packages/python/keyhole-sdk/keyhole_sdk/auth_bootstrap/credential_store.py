@@ -67,6 +67,13 @@ class CredentialStore:
     def _ensure_dir(self) -> None:
         """Create the store directory if it doesn't exist."""
         try:
+            parent = self._store_dir.parent
+            if (
+                not self._store_dir.exists()
+                and parent.exists()
+                and not (parent.stat().st_mode & stat.S_IWUSR)
+            ):
+                raise OSError(f"Parent directory is not writable: {parent}")
             self._store_dir.mkdir(parents=True, exist_ok=True)
             # Restrict directory permissions
             os.chmod(self._store_dir, stat.S_IRWXU)  # 0700

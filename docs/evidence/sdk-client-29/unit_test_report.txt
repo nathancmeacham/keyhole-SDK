@@ -1,0 +1,28 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-7.4.4, pluggy-1.0.0 -- <local-python>
+cachedir: .pytest_cache
+rootdir: <local-checkout>
+plugins: anyio-4.2.0
+collecting ... collected 19 items
+
+tests/unit/test_sdk_client_29_actor_envelope.py::test_whoami_parses_actor_envelope_when_present PASSED [  5%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_whoami_without_envelope_is_backward_compatible PASSED [ 10%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_unwrap_identity_propagates_actor_envelope PASSED [ 15%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_cli_whoami_output_redacts_token PASSED [ 21%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_auth_doctor_uses_server_whoami_as_authority PASSED [ 26%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_auth_doctor_does_not_use_jwt_for_authority PASSED [ 31%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_auth_doctor_flags_direct_kh_prod_token PASSED [ 36%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_write_bearing_ops_require_idempotency[run.start] PASSED [ 42%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_write_bearing_ops_require_idempotency[register] PASSED [ 47%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_write_bearing_ops_require_idempotency[realize] PASSED [ 52%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_write_bearing_ops_require_idempotency[ingest.submit] PASSED [ 57%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_write_bearing_ops_require_idempotency[repo.register] PASSED [ 63%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_read_only_ops_do_not_require_idempotency[context.compile] PASSED [ 68%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_read_only_ops_do_not_require_idempotency[gaps.list] PASSED [ 73%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_read_only_ops_do_not_require_idempotency[events.query] PASSED [ 78%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_read_only_ops_do_not_require_idempotency[run.status] PASSED [ 84%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_envelope_preserves_unknown_fields PASSED [ 89%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_login_success_reports_actor_envelope_present PASSED [ 94%]
+tests/unit/test_sdk_client_29_actor_envelope.py::test_login_success_warns_when_envelope_missing PASSED [100%]
+
+============================= 19 passed in 0.93s ==============================

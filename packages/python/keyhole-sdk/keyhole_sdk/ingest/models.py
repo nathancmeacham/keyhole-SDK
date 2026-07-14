@@ -113,6 +113,10 @@ class IngestionPackage(BaseModel):
     compatibility_inputs: Dict[str, Any] = Field(default_factory=dict)
     shadow: bool = Field(False)
     correlation_id: str = Field("")
+    gap_id: str = Field("")
+    repo_remote: str = Field("")
+    commit_sha: str = Field("")
+    current_branch: str = Field("")
     builder_hints: Dict[str, Any] = Field(default_factory=dict)
     package_timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
@@ -136,6 +140,9 @@ class IngestionRequest(BaseModel):
 
     package: IngestionPackage
     identity_fingerprint: str = Field("")
+    gap_id: str = Field("")
+    repo_remote: str = Field("")
+    commit_sha: str = Field("")
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
     )
@@ -145,6 +152,9 @@ class IngestionRequest(BaseModel):
         return {
             "package": self.package.to_payload(),
             "identity_fingerprint": self.identity_fingerprint,
+            "gap_id": self.gap_id or self.package.gap_id,
+            "repo_remote": self.repo_remote or self.package.repo_remote,
+            "commit_sha": self.commit_sha or self.package.commit_sha,
             "timestamp": self.timestamp,
         }
 
@@ -158,6 +168,9 @@ class IngestionRequest(BaseModel):
                 "total_included": len(self.package.included_file_manifest),
                 "shadow": self.package.shadow,
                 "correlation_id": self.package.correlation_id,
+                "gap_id": self.gap_id or self.package.gap_id,
+                "repo_remote": self.repo_remote or self.package.repo_remote,
+                "commit_sha": self.commit_sha or self.package.commit_sha,
             },
             "identity_fingerprint": self.identity_fingerprint,
             "timestamp": self.timestamp,

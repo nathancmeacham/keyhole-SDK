@@ -1,0 +1,207 @@
+# Public Developer Surface Inventory
+# Story: CE-V5-S41-01
+# Version: 1.0.0
+# Last Updated: 2026-03-10
+#
+# This manifest declares every file and path that is governed as part of the
+# public Keyhole developer surface.  Promotion enforcement uses this inventory
+# to detect undeclared surface expansion and to verify cross-surface alignment.
+
+version: "1.0.0"
+story: CE-V5-S41-01
+
+# ── Runtime Contract (source of truth) ──────────────────────────────────────
+
+runtime_contract:
+  identity_fields:
+    - runtime_id
+    - runtime_name
+    - runtime_version
+    - environment
+    - capabilities
+  receipt_fields:
+    - digest
+    - status
+    - message
+    - realized_at
+  health_fields:
+    - status
+  state_fields:
+    - current_digest
+    - realized_digests
+    - updated_at
+
+# ── Surface Classes ─────────────────────────────────────────────────────────
+
+surfaces:
+
+  cli:
+    description: "Public command-line entry point"
+    paths:
+      - packages/python/keyhole-cli/keyhole_cli/cli.py
+      - packages/python/keyhole-cli/pyproject.toml
+      - packages/python/keyhole-cli/README.md
+
+  sdk:
+    description: "Public programmatic client"
+    paths:
+      - packages/python/keyhole-sdk/keyhole_sdk/__init__.py
+      - packages/python/keyhole-sdk/keyhole_sdk/client.py
+      - packages/python/keyhole-sdk/keyhole_sdk/models.py
+      - packages/python/keyhole-sdk/pyproject.toml
+      - packages/python/keyhole-sdk/README.md
+
+  runtime:
+    description: "Public test runtime"
+    paths:
+      - services/test-runtime/app/main.py
+      - services/test-runtime/app/routes.py
+      - services/test-runtime/app/models.py
+      - services/test-runtime/app/state.py
+      - services/test-runtime/app/bridge.py
+      - services/test-runtime/requirements.txt
+      - services/test-runtime/Dockerfile
+      - services/test-runtime/README.md
+
+  openapi:
+    description: "Public OpenAPI spec"
+    paths:
+      - openapi/test-runtime.openapi.yaml
+
+  schemas:
+    description: "Public JSON schemas"
+    paths:
+      - schemas/realization_request.v1.schema.json
+      - schemas/runtime_realization_receipt.v1.schema.json
+      - schemas/promotion_realization_package.v1.schema.json
+
+  docs:
+    description: "Public documentation"
+    paths:
+      - README.md
+      - docs/quickstart.md
+      - docs/test-runtime.md
+      - docs/bridge-contract.md
+      - docs/architecture.md
+      - docs/traefik-deploy.md
+      - docs/AGENT.md
+      - docs/auth-bootstrap.md
+      - docs/smoke.md
+
+  examples:
+    description: "Public examples and smoke tests"
+    paths:
+      - examples/bridge-smoke-test/smoke-test.sh
+      - examples/bridge-smoke-test/smoke-test.ps1
+      - examples/bridge-smoke-test/README.md
+      - examples/python-client/README.md
+      - examples/python-client/retrieve_context.py
+      - examples/python-client/safe_dispatch.py
+      - examples/python-client/smoke_readonly.py
+
+  deploy:
+    description: "Public deployment templates"
+    paths:
+      - docker-compose.yml
+      - deploy/compose.server.yml
+
+  workspace:
+    description: "Public agent/IDE guidance"
+    paths:
+      - .github/copilot-instructions.md
+      - .vscode/mcp.json
+
+  governance:
+    description: "Surface contract governance (this story)"
+    paths:
+      - docs/specs/developer_ecosystem/public_surface_contract.md
+      - docs/specs/developer_ecosystem/public_surface_inventory.yaml
+      - services/shared/developer_surface_contract/__init__.py
+      - services/shared/developer_surface_contract/invariants.py
+      - services/shared/developer_surface_contract/validate.py
+      - services/shared/developer_surface_contract/release_gate.py
+
+# ── Forbidden Patterns ──────────────────────────────────────────────────────
+# These regex patterns must not appear in any governed public surface file.
+
+forbidden_patterns:
+  private_cluster_refs:
+    - "keyhole-system"
+    - "keyhole-storage"
+    - "keyhole-egress-gateway"
+    - "keyhole-prod"
+    - "nats\\.nats\\.svc"
+    - "qdrant\\.keyhole-storage"
+    - "controller-manager"
+  private_api_refs:
+    - "/mcp/v1/runs/"
+    - "/mcp/v1/events/"
+    - "/mcp/v1/memory/"
+    # NOTE: /mcp/sse is the canonical VS Code MCP integration endpoint (SSE transport
+    # for Model Context Protocol). It is NOT a private or forbidden path. It must never
+    # appear in this forbidden list. The tombstoning of "SSE" applies only to the old
+    # pre-S42 SDK-internal SSE transport layer — not to the VS Code MCP SSE server.
+  credentials:
+    - "KEYHOLE_APP_PASSWORD"
+    - "app_password"
+    - "Bearer eyJ"
+  internal_topology:
+    - "localhost:5000"
+    - "mcp-server-sandbox"
+    - "mcp-prod-us1"
+
+# Paths exempt from specific forbidden pattern categories.
+# These files legitimately reference private patterns as part of their function.
+forbidden_pattern_exemptions:
+  - path: services/test-runtime/app/bridge.py
+    categories: [private_api_refs]
+    reason: "Bridge implementation calls MCP /mcp/v1/runs/ endpoint by design"
+  - path: docs/architecture.md
+    categories: [private_api_refs]
+    reason: "Architecture doc explains bridge flow including MCP API paths"
+  - path: .github/copilot-instructions.md
+    categories: [private_api_refs]
+    reason: "Agent instructions teach boundary surface categories for governed participant behavior"
+  - path: docs/AGENT.md
+    categories: [private_api_refs]
+    reason: "Agent alignment doc teaches context-access run dispatch for governed participant behavior"
+  - path: docs/auth-bootstrap.md
+    categories: [private_api_refs]
+    reason: "Auth bootstrap doc teaches authenticated surface categories including run dispatch and event query paths"
+  - path: examples/python-client/retrieve_context.py
+    categories: [private_api_refs]
+    reason: "Context retrieval example demonstrates governed context access through POST /mcp/v1/runs/start"
+  - path: examples/python-client/safe_dispatch.py
+    categories: [private_api_refs]
+    reason: "Safe dispatch example demonstrates governed run dispatch through MCP boundary"
+  - path: examples/python-client/smoke_readonly.py
+    categories: [private_api_refs]
+    reason: "Smoke path example runs full read-only participant verification through MCP boundary"
+  - path: docs/smoke.md
+    categories: [private_api_refs]
+    reason: "Smoke path documentation explains the read-only verification flow including MCP API paths"
+  - path: README.md
+    categories: [private_api_refs]
+    reason: "README explains context retrieval through POST /mcp/v1/runs/start as part of boundary discipline"
+
+# ── Forbidden Response Fields ───────────────────────────────────────────────
+# These field names must not appear in example JSON responses in docs/examples.
+
+forbidden_response_fields:
+  identity: []
+  receipt:
+    - result
+    - version
+    - pointer
+
+# ── Mode Truth Rules ───────────────────────────────────────────────────────
+
+mode_truth:
+  local_only_forbidden_claims:
+    - "Event Spine"
+    - "upstream audit"
+    - "governance-backed"
+    - "APPROVED"
+  governed_required_context:
+    - "KEYHOLE_MCP_URL"
+    - "KEYHOLE_MCP_TOKEN"

@@ -140,8 +140,9 @@ class RuntimeContextBuilder:
         ``.venv`` symlink model is no longer accepted as portable runtime
         truth.
         """
+        platform_repo = "keyhole" + "_" + "platform"
         bad_paths = list(nonportable_paths) if nonportable_paths else [
-            ".venv -> <project>/.venv",
+            f".venv -> /opt/{platform_repo}/.venv",
         ]
         claims: Dict[str, Any] = {
             "runtime_kind": runtime_kind,

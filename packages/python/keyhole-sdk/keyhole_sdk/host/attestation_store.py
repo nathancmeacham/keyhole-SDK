@@ -18,6 +18,7 @@ import json
 import os
 import stat
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import List, Optional
 
@@ -31,6 +32,19 @@ _DIR_PERMISSIONS = stat.S_IRWXU  # 0700
 _ATTESTATION_SUBDIR = "host_attestations"
 _IDENTITY_POLICY_FILE = "identity_policy.json"
 _PRINCIPAL_HINT_FILE = "principal_hint.json"
+
+
+def _chmod_open_file(fd: int, path: str, mode: int) -> None:
+    """Apply restrictive permissions to an open file on POSIX and Windows."""
+    if hasattr(os, "fchmod"):
+        os.fchmod(fd, mode)
+    else:
+        os.chmod(path, mode)
+
+
+def _close_fd(fd: int) -> None:
+    with suppress(OSError):
+        os.close(fd)
 
 
 def _resolve_keyhole_home() -> Path:
@@ -78,11 +92,12 @@ def write_attestation(
     )
     try:
         os.write(fd, data.encode("utf-8"))
-        os.fchmod(fd, _FILE_PERMISSIONS)
-        os.close(fd)
-        os.rename(tmp_path, str(dest_path))
+        _chmod_open_file(fd, tmp_path, _FILE_PERMISSIONS)
+        _close_fd(fd)
+        os.replace(tmp_path, str(dest_path))
+        os.chmod(dest_path, _FILE_PERMISSIONS)
     except BaseException:
-        os.close(fd) if not os.get_inheritable(fd) else None
+        _close_fd(fd)
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -148,11 +163,12 @@ def save_identity_policy(
     )
     try:
         os.write(fd, data.encode("utf-8"))
-        os.fchmod(fd, _FILE_PERMISSIONS)
-        os.close(fd)
-        os.rename(tmp_path, str(dest_path))
+        _chmod_open_file(fd, tmp_path, _FILE_PERMISSIONS)
+        _close_fd(fd)
+        os.replace(tmp_path, str(dest_path))
+        os.chmod(dest_path, _FILE_PERMISSIONS)
     except BaseException:
-        os.close(fd) if not os.get_inheritable(fd) else None
+        _close_fd(fd)
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -201,10 +217,12 @@ def save_principal_hint(
     )
     try:
         os.write(fd, data.encode("utf-8"))
-        os.fchmod(fd, _FILE_PERMISSIONS)
-        os.close(fd)
-        os.rename(tmp_path, str(hint_path))
+        _chmod_open_file(fd, tmp_path, _FILE_PERMISSIONS)
+        _close_fd(fd)
+        os.replace(tmp_path, str(hint_path))
+        os.chmod(hint_path, _FILE_PERMISSIONS)
     except BaseException:
+        _close_fd(fd)
         try:
             os.unlink(tmp_path)
         except OSError:

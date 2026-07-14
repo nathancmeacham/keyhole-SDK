@@ -22,6 +22,10 @@ def build_ingestion_package(
     *,
     shadow: bool = False,
     correlation_id: str = "",
+    gap_id: str = "",
+    repo_remote: str = "",
+    commit_sha: str = "",
+    current_branch: str = "",
     builder_hints: Optional[Dict[str, Any]] = None,
     exclusion_rules: Optional[list[str]] = None,
 ) -> IngestionPackage:
@@ -34,6 +38,10 @@ def build_ingestion_package(
         scan: The completed repo scan result.
         shadow: Whether this is a shadow/exploratory ingestion.
         correlation_id: Correlation ID for tracing. Auto-generated if empty.
+        gap_id: Canonical gap identifier for governed repo registration.
+        repo_remote: Git origin URL for the subject repository.
+        commit_sha: Current Git HEAD SHA for the subject repository.
+        current_branch: Current Git branch for the subject repository.
         builder_hints: Optional builder-supplied hints for the server.
         exclusion_rules: Exclusion rules applied during scan.
 
@@ -80,6 +88,10 @@ def build_ingestion_package(
         compatibility_inputs=compatibility_inputs,
         shadow=shadow,
         correlation_id=correlation_id,
+        gap_id=gap_id,
+        repo_remote=repo_remote,
+        commit_sha=commit_sha,
+        current_branch=current_branch,
         builder_hints=builder_hints or {},
     )
 

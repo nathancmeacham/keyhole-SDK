@@ -1,49 +1,48 @@
-# Local Keyhole runtime state
-.keyhole/
-governed-runs/
-runs/
-latest.json
-proof_bundle/
-
-# Generated governance artifacts
-*.receipt.json
-*.proof.json
-*.evidence.json
-*.attestation.json
-
-# Python/cache/test output
+# Python build artifacts
+dist/
+build/
+*.egg-info/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Build/package output
-dist/
-build/
-*.egg-info/
 
 # Python environments
 .venv/
 venv/
 env/
 
-# Local environment
+# Environment files — ignore real .env files, but track the example template
 .env
 .env.*
 !.env.example
+.env.local
+.env.*.local
 
-# IDE and local machine files
+# Keyhole generated local governance state
+.keyhole/
+**/.keyhole/
+proof_bundle/
+**/proof_bundle/
+gaps_current.json
+
+# Local credentials and secrets
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+
+# IDE
 *.code-workspace
-.vscode/
+.vscode/mcp.local.json
 
 # Logs
 *.log
 *.out
+# Docker runtime artifacts
+.docker/
 
 # OS files
 .DS_Store

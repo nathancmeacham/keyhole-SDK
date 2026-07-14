@@ -1,0 +1,338 @@
+openapi: 3.0.3
+
+info:
+  title: Keyhole Test Runtime API
+  description: Public test runtime for the Keyhole developer ecosystem.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development runtime
+  - url: https://runtime.example.yourdomain.com
+    description: Example public deployment behind Traefik
+
+tags:
+  - name: Runtime
+    description: Public runtime surface for health, identity, state, and realization
+
+paths:
+  /healthz:
+    get:
+      tags:
+        - Runtime
+      summary: Health check
+      description: Returns runtime liveness.
+      operationId: healthz
+      responses:
+        "200":
+          description: Runtime is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    status: ok
+        "500":
+          description: Internal runtime error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /identity:
+    get:
+      tags:
+        - Runtime
+      summary: Runtime identity
+      description: Returns runtime identity and declared capabilities.
+      operationId: identity
+      responses:
+        "200":
+          description: Runtime identity and capabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityResponse"
+              examples:
+                identity:
+                  value:
+                    runtime_id: keyhole-test-runtime
+                    runtime_name: Keyhole Test Runtime
+                    runtime_version: "0.1.0"
+                    environment: dev
+                    capabilities:
+                      - realize
+                      - state
+                      - health
+        "500":
+          description: Internal runtime error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /state:
+    get:
+      tags:
+        - Runtime
+      summary: Current runtime state
+      description: Returns the current runtime-local state view.
+      operationId: state
+      responses:
+        "200":
+          description: Current runtime-local state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateResponse"
+              examples:
+                initial:
+                  value:
+                    current_digest: null
+                    realized_digests: []
+                    updated_at: "2026-03-06T12:00:00+00:00"
+                realized:
+                  value:
+                    current_digest: sha256:abc123
+                    realized_digests:
+                      - sha256:abc123
+                    updated_at: "2026-03-06T12:01:00+00:00"
+        "500":
+          description: Internal runtime error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /realize:
+    post:
+      tags:
+        - Runtime
+      summary: Realize a candidate digest
+      description: >
+        Accepts a bounded realization request. The first submission of a new
+        candidate digest returns ACCEPT. Replaying the same digest returns
+        ALREADY_REALIZED without mutating state again.
+      operationId: realize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RealizationRequest"
+            examples:
+              basic:
+                value:
+                  candidate_digest: sha256:abc123
+                  payload: {}
+      responses:
+        "200":
+          description: Realization receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RealizationReceipt"
+              examples:
+                accepted:
+                  summary: Accepted (first submission)
+                  value:
+                    digest: sha256:abc123
+                    status: ACCEPT
+                    message: Digest realized successfully.
+                    realized_at: "2026-03-06T12:01:00+00:00"
+                replay:
+                  summary: Already realized (idempotent replay)
+                  value:
+                    digest: sha256:abc123
+                    status: ALREADY_REALIZED
+                    message: Digest has already been realized. No state mutation performed.
+                    realized_at: "2026-03-06T12:02:00+00:00"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+        "500":
+          description: Internal runtime error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: ok
+
+    IdentityResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - runtime_id
+        - runtime_name
+        - runtime_version
+        - environment
+        - capabilities
+      properties:
+        runtime_id:
+          type: string
+          example: keyhole-test-runtime
+        runtime_name:
+          type: string
+          example: Keyhole Test Runtime
+        runtime_version:
+          type: string
+          example: "0.1.0"
+        environment:
+          type: string
+          example: dev
+        capabilities:
+          type: array
+          items:
+            type: string
+          example:
+            - realize
+            - state
+            - health
+
+    StateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - current_digest
+        - realized_digests
+        - updated_at
+      properties:
+        current_digest:
+          type: string
+          nullable: true
+          example: null
+        realized_digests:
+          type: array
+          items:
+            type: string
+          example:
+            - sha256:abc123
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-03-06T12:00:00+00:00"
+
+    RealizationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_digest
+      properties:
+        candidate_digest:
+          type: string
+          example: sha256:abc123
+        payload:
+          type: object
+          nullable: true
+          additionalProperties: true
+          default: {}
+        promotion_uuid:
+          type: string
+          nullable: true
+          description: Present when the request originates from the Keyhole reference bridge.
+        artifact_refs:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Artifact references attached by the bridge.
+        expected_capabilities:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Capabilities the bridge expects the runtime to provide.
+        lane:
+          type: string
+          nullable: true
+          description: Deployment lane (e.g. "prod", "dev").
+        purpose:
+          type: string
+          nullable: true
+          description: Deployment purpose (e.g. "production", "staging").
+
+    RealizationReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - digest
+        - status
+        - message
+        - realized_at
+      properties:
+        digest:
+          type: string
+          example: sha256:abc123
+        status:
+          type: string
+          enum:
+            - ACCEPT
+            - ALREADY_REALIZED
+          example: ACCEPT
+        message:
+          type: string
+          example: Digest realized successfully.
+        realized_at:
+          type: string
+          format: date-time
+          example: "2026-03-06T12:01:00+00:00"
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: Internal server error
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+
+    HTTPValidationError:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationError"

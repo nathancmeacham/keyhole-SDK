@@ -1,4 +1,4 @@
-"""`keyhole deregister` — account deletion command.
+"""`keyhole deregister` - account deletion command.
 
 Implements SDK-CLIENT-22: Account Deregistration and Deletion UX.
 
@@ -40,11 +40,11 @@ def _resolve_proof_dir() -> Path:
     return Path.home() / ".keyhole"
 
 
-# ── Status → human-readable rendering ─────────────────────
+# -- Status -> human-readable rendering ---------------------
 
 _STATUS_ICONS = {
     DeregistrationStatus.ACCEPTED: "\u2714",      # ✔
-    DeregistrationStatus.DEFERRED: "\u23F3",       # ⏳
+    DeregistrationStatus.DEFERRED: "\u23F3",       # ?
     DeregistrationStatus.REPLAYED: "\u21A9",       # ↩
     DeregistrationStatus.REJECTED: "\u2717",       # ✗
     DeregistrationStatus.ALREADY_DELETED: "\u2139", # ℹ
@@ -74,7 +74,7 @@ def run_deregister(
     correlation_id = str(uuid.uuid4())
     proof = DeregistrationProofBundle(correlation_id=correlation_id)
 
-    # ── 1. Authentication check ─────────────────────────────
+    # -- 1. Authentication check -----------------------------
     store = CredentialStore()
     session = store.load()
 
@@ -86,7 +86,7 @@ def run_deregister(
             success=False,
             exit_code=EXIT_FAILURE,
             data={"error_class": "deregistration_not_authenticated"},
-            summary="Not authenticated — no stored credentials found.",
+            summary="Not authenticated - no stored credentials found.",
             next_steps=["Run 'keyhole login' first."],
         )
 
@@ -105,7 +105,7 @@ def run_deregister(
             ],
         )
 
-    # ── 2. Identity inspection via whoami ────────────────────
+    # -- 2. Identity inspection via whoami --------------------
     identity_snapshot = {}
     try:
         whoami_client = WhoamiClient(mcp_base_url=mcp_url)
@@ -121,9 +121,9 @@ def run_deregister(
         proof.record_event("identity_inspected", identity_snapshot)
     except Exception as exc:
         proof.record_event("identity_inspection_failed", {"error": str(exc)})
-        # Non-fatal — server enforces ownership. Warn but proceed.
+        # Non-fatal - server enforces ownership. Warn but proceed.
 
-    # ── 3. Destructive confirmation ─────────────────────────
+    # -- 3. Destructive confirmation -------------------------
     if not yes:
         proof.record_event("confirmation_required", {
             "registration_id": registration_id,
@@ -146,7 +146,7 @@ def run_deregister(
             ],
         )
 
-    # ── 4. Build request and dispatch ───────────────────────
+    # -- 4. Build request and dispatch -----------------------
     request = DeregistrationRequest(
         registration_id=registration_id,
         confirm=True,
@@ -183,7 +183,7 @@ def run_deregister(
             next_steps=exc.repair_suggestions or ["Retry: keyhole deregister --help"],
         )
 
-    # ── 5. Record proof and write ───────────────────────────
+    # -- 5. Record proof and write ---------------------------
     proof.record_event("deregistration_outcome", outcome.safe_summary())
 
     is_success = outcome.status in (
@@ -204,7 +204,7 @@ def run_deregister(
     except Exception:
         pass
 
-    # ── 6. Build result ─────────────────────────────────────
+    # -- 6. Build result -------------------------------------
     icon = _STATUS_ICONS.get(outcome.status, "?")
     label = _STATUS_LABELS.get(outcome.status, outcome.status.value)
 
@@ -252,7 +252,7 @@ def run_deregister(
 
 
 def _write_proof_safe(proof: DeregistrationProofBundle, *, success: bool) -> None:
-    """Best-effort proof write — never raises."""
+    """Best-effort proof write - never raises."""
     try:
         proof.write(success=success, output_dir=_resolve_proof_dir())
     except Exception:

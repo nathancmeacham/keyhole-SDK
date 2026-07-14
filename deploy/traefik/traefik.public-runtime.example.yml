@@ -1,0 +1,18 @@
+services:
+  keyhole-test-runtime:
+    image: ${KEYHOLE_RUNTIME_IMAGE:-keyhole/test-runtime:local}
+    environment:
+      KEYHOLE_RUNTIME_MODE: ${KEYHOLE_RUNTIME_MODE:-local-only}
+      KEYHOLE_MCP_URL: ${KEYHOLE_MCP_URL:-}
+      KEYHOLE_MCP_TOKEN: ${KEYHOLE_MCP_TOKEN:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keyhole-runtime.rule=Host(`example.yourdomain.com`)"
+      - "traefik.http.routers.keyhole-runtime.entrypoints=websecure"
+      - "traefik.http.routers.keyhole-runtime.tls=true"
+      - "traefik.http.services.keyhole-runtime.loadbalancer.server.port=8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

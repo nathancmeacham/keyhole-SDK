@@ -5,7 +5,7 @@ and returns typed results. The client never decides runtime trust; it
 only carries the server's classification back to the caller.
 
 The client must NOT:
-  - import platform internals (no ``from keyhole_platform import ...``)
+  - import platform internals
   - call internal cluster services (NATS, k8s, vault, db)
   - resolve ``.venv`` symlinks as platform truth
   - replicate any control-plane decision logic

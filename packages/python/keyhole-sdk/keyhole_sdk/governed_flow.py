@@ -18,6 +18,7 @@ from keyhole_sdk.governed_demo import (
     _candidate_digest,
     _extract_claim_id,
     _extract_claim_ref,
+    _extract_context_digest,
     _extract_context_id,
     _file_digest,
     _first_string,
@@ -32,6 +33,7 @@ from keyhole_sdk.governed_demo import (
     _run_local_invariant,
     _select_gap_id,
     _unwrap_mcp_envelope,
+    _valid_ctxpack_digest,
     _validate_governed_receipt,
     _write_state,
     BoundaryOperation,
@@ -126,6 +128,25 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         self.state_store: Optional[GovernedRunStateStore] = None
         self.current_state: Dict[str, Any] = {}
         self.current_repo: Optional[Path] = None
+        self.gap_id_claimable_verified = False
+
+    def _resolve_gap_id(self, repo: Path) -> str:
+        if self.operator_gap_id:
+            if not self.operator_gap_id.startswith("gap_"):
+                raise GovernedDemoError("--gap-id must be a canonical gap_* id.")
+            self.resolved_gap_id = self.operator_gap_id
+            self.gap_id_source = "operator --gap-id"
+            self.gap_id_claimable_verified = True
+            return self.operator_gap_id
+        try:
+            gap_id = super()._resolve_gap_id(repo)
+            self.gap_id_claimable_verified = self.gap_id_source == "gaps.list"
+            return gap_id
+        except GovernedDemoError as exc:
+            raise GovernedDemoError(
+                f"{exc} Run 'keyhole gaps list --json' to inspect claimable gaps, "
+                "or pass an explicit canonical gap with --gap-id gap_..."
+            ) from exc
 
     @classmethod
     def from_env(
@@ -198,6 +219,7 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         if self.current_state.get("resolved_gap_id"):
             self.resolved_gap_id = str(self.current_state["resolved_gap_id"])
             self.gap_id_source = str(self.current_state.get("gap_id_source") or "")
+            self.gap_id_claimable_verified = False
         return dict(self.current_state)
 
     def run_governed_repo_flow(
@@ -206,7 +228,7 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         *,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        declaration = self.inspect_repo(repo_dir, persist_state=not dry_run)
+        declaration = self.inspect_repo(repo_dir, persist_state=False)
         self.discover()
         if dry_run:
             gap_id = self.operator_gap_id or self._resolve_gap_id(declaration.repo_dir)
@@ -237,7 +259,11 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         self._recover_pending_run()
         declaration = self.repo_declaration or self.inspect_repo(repo)
         if not self.current_state.get("resolved_gap_id"):
-            gap_id = self._resolve_gap_id(declaration.repo_dir)
+            try:
+                gap_id = self._resolve_gap_id(declaration.repo_dir)
+            except GovernedDemoError as exc:
+                self._persist_gap_resolution_error(exc)
+                raise
             self._persist_state({
                 "resolved_gap_id": gap_id,
                 "gap_id_source": self.gap_id_source,
@@ -250,6 +276,7 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
             self._persist_state({
                 "claim_id": claim.get("claim_id", ""),
                 "claim_ref": claim.get("claim_ref", ""),
+                "claim_ctxpack_digest": claim.get("ctxpack_digest", ""),
                 "resolved_gap_id": claim.get("gap_id", self.resolved_gap_id),
                 "gap_id_source": claim.get("gap_id_source", self.gap_id_source),
                 "status": "claim_succeeded",
@@ -264,6 +291,10 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
                 "gap_id_source": registration.get("gap_id_source", self.gap_id_source),
                 "claim_id": registration.get("claim_id", self.current_state.get("claim_id", "")),
                 "claim_ref": registration.get("claim_ref", self.current_state.get("claim_ref", "")),
+                "claim_ctxpack_digest": registration.get(
+                    "claim_ctxpack_digest",
+                    self.current_state.get("claim_ctxpack_digest", ""),
+                ),
                 "status": "context_created",
                 "step": "context_created",
                 "terminal": False,
@@ -272,7 +303,7 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
             context = self.compile_context(declaration.repo_dir)
             self._persist_state({
                 "governance_context_id": context.get("governance_context_id", ""),
-                "ctxpack_digest": context.get("governance_context_id", ""),
+                "ctxpack_digest": context.get("ctxpack_digest", context.get("governance_context_id", "")),
                 "status": "context_compiled",
                 "step": "context_compiled",
                 "terminal": False,
@@ -335,14 +366,17 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
             "claim_ref": str(self.current_state.get("claim_ref") or ""),
             "gap_id": str(self.current_state.get("resolved_gap_id") or self.resolved_gap_id or self.story_id),
             "gap_id_source": str(self.current_state.get("gap_id_source") or self.gap_id_source),
+            "ctxpack_digest": str(self.current_state.get("claim_ctxpack_digest") or ""),
         }
         if not (claim["claim_id"] or claim["claim_ref"]) and _requires_active_claim(self.capabilities):
             claim = self.claim_gap(repo)
+        if not claim.get("ctxpack_digest"):
+            claim["ctxpack_digest"] = self._current_canonical_digest(repo)
         payload = _build_generic_registration_payload(self, repo, op, claim)
         response = self.session.request(
             op.method,
             f"{self.mcp_url}{op.path}",
-            headers=self._headers(),
+            headers=self._headers(idempotent=True),
             json=payload,
             timeout=self.timeout,
         )
@@ -373,6 +407,7 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
             "registration_id": registration_id,
             "claim_id": claim.get("claim_id", ""),
             "claim_ref": claim.get("claim_ref", ""),
+            "claim_ctxpack_digest": claim.get("ctxpack_digest", ""),
             "gap_id": claim.get("gap_id", self.story_id),
             "story_id": self.story_id,
             "gap_id_source": claim.get("gap_id_source", self.gap_id_source),
@@ -380,6 +415,49 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         }
         _write_state(repo, REGISTRATION_STATE, state)
         return state
+
+    def claim_gap(self, repo_path: str | Path) -> Dict[str, Any]:
+        repo = Path(repo_path).resolve()
+        self._refresh_cached_gap_claimability(repo)
+        return super().claim_gap(repo)
+
+    def _refresh_cached_gap_claimability(self, repo: Path) -> None:
+        if self.gap_id_claimable_verified or self.operator_gap_id:
+            return
+        cached_gap_id = str(self.current_state.get("resolved_gap_id") or self.resolved_gap_id or "")
+        if not cached_gap_id:
+            return
+        self.resolved_gap_id = ""
+        try:
+            live_gap_id = self._resolve_gap_id(repo)
+        except GovernedDemoError as exc:
+            self.resolved_gap_id = cached_gap_id
+            self._persist_state({
+                "status": "no_claimable_gap",
+                "step": "gap_resolved",
+                "terminal": False,
+                "error_code": "NO_CLAIMABLE_GAP",
+                "error_message": str(exc),
+            })
+            raise
+        if live_gap_id != cached_gap_id:
+            self._persist_state({
+                "resolved_gap_id": live_gap_id,
+                "gap_id_source": self.gap_id_source,
+                "status": "gap_resolved",
+                "step": "gap_resolved",
+                "terminal": False,
+            })
+
+    def _persist_gap_resolution_error(self, exc: GovernedDemoError) -> None:
+        message = str(exc)
+        self._persist_state({
+            "status": "no_claimable_gap" if "NO_CLAIMABLE_GAP" in message else "gap_resolution_failed",
+            "step": "gap_resolution",
+            "terminal": False,
+            "error_code": "NO_CLAIMABLE_GAP" if "NO_CLAIMABLE_GAP" in message else "GAP_RESOLUTION_FAILED",
+            "error_message": message,
+        })
 
     def compile_context(self, repo_path: str | Path) -> Dict[str, Any]:
         self._ensure_discovered()
@@ -398,10 +476,18 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
                 "story_id": self.story_id,
             },
         }
+        context_ref = _first_string(
+            self.current_state.get("claim_ctxpack_digest"),
+            self._current_canonical_digest(repo),
+        )
+        if context_ref:
+            payload["ctxpack_digest"] = context_ref
+            payload["context_ref"] = context_ref
+            payload["params"]["ctxpack_digest"] = context_ref
         response = self.session.request(
             op.method,
             f"{self.mcp_url}{op.path}",
-            headers=self._headers(),
+            headers=self._headers(idempotent=True),
             json=payload,
             timeout=self.timeout,
         )
@@ -410,10 +496,12 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         _raise_for_mcp_error(data, "context compile")
         data = self._resolve_async_result(data, "context compile")
         context_id = _extract_context_id(data)
+        ctxpack_digest = _extract_context_digest(data) or context_id
         if not context_id:
             raise GovernedDemoError("context.compile response missing governance_context_id or context digest.")
         state = {
             "governance_context_id": context_id,
+            "ctxpack_digest": ctxpack_digest,
             "registration_id": registration_id,
             "upstream": _redact(data),
         }
@@ -424,12 +512,28 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
         self._ensure_discovered()
         repo = Path(repo_path).resolve()
         context_id = str(self.current_state.get("governance_context_id") or "")
+        context_ref = _valid_ctxpack_digest(self.current_state.get("ctxpack_digest"))
+        context_state: Dict[str, Any] = {}
         if not context_id:
-            context = _read_state(repo, CONTEXT_STATE)
-            context_id = str(context.get("governance_context_id") or "")
+            context_state = _read_state(repo, CONTEXT_STATE)
+            context_id = str(context_state.get("governance_context_id") or "")
+        if not context_ref:
+            if not context_state:
+                try:
+                    context_state = _read_state(repo, CONTEXT_STATE)
+                except GovernedDemoError:
+                    context_state = {}
+            context_ref = _first_string(
+                _valid_ctxpack_digest(context_state.get("ctxpack_digest")),
+                _extract_context_digest(context_state.get("upstream") if isinstance(context_state.get("upstream"), dict) else {}),
+                _valid_ctxpack_digest(context_id),
+            )
         local_invariant = _run_local_invariant(repo, self.capability_id)
         candidate_digest = _candidate_digest(repo, local_invariant, {"governance_context_id": context_id})
-        self._persist_state({"candidate_digest": candidate_digest})
+        state_update = {"candidate_digest": candidate_digest}
+        if context_ref:
+            state_update["ctxpack_digest"] = context_ref
+        self._persist_state(state_update)
         op = self._require_operation("governed.realize")
         request = {
             "run_type": op.run_type or "governed.realize",
@@ -440,6 +544,9 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
                 "local_invariant_result": local_invariant,
             },
         }
+        if context_ref:
+            request["ctxpack_digest"] = context_ref
+            request["context_ref"] = context_ref
         if op.surface == "runtime":
             response = self.session.post(
                 f"{self.runtime_url}/realize",
@@ -450,7 +557,7 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
             response = self.session.request(
                 op.method,
                 f"{self.mcp_url}{op.path}",
-                headers=self._headers(),
+                headers=self._headers(idempotent=True),
                 json=request,
                 timeout=self.timeout,
             )
@@ -593,9 +700,10 @@ class GovernedRepoFlowClient(GovernedFirstAppClient):
             })
         elif step in {"preclaim_context", "context_compile"}:
             context_id = _extract_context_id(data)
+            ctxpack_digest = _extract_context_digest(data) or context_id
             updates.update({
                 "governance_context_id": context_id,
-                "ctxpack_digest": context_id,
+                "ctxpack_digest": ctxpack_digest,
                 "status": "context_compiled" if step == "context_compile" else "preclaim_context_ready",
                 "step": "context_compiled" if step == "context_compile" else "preclaim_context_ready",
             })
@@ -834,10 +942,16 @@ def _build_generic_registration_payload(
             },
             "native_artifacts": declaration.native_artifacts,
         }
-    return {
+    context_ref = str(claim.get("ctxpack_digest") or "")
+    payload = {
         "run_type": op.run_type,
         "params": params,
     }
+    if context_ref:
+        params["ctxpack_digest"] = context_ref
+        payload["ctxpack_digest"] = context_ref
+        payload["context_ref"] = context_ref
+    return payload
 
 
 def _sanitize_state(state: Dict[str, Any]) -> Dict[str, Any]:

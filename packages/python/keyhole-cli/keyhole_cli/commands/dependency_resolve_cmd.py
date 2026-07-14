@@ -76,10 +76,19 @@ def run_dependency_resolve(
     store_dir = Path(keyhole_home) if keyhole_home else None
     cred_store = CredentialStore(store_dir=store_dir)
     session = cred_store.load()
+    if session is None:
+        return CommandResult(
+            command=command_label,
+            success=False,
+            exit_code=EXIT_FAILURE,
+            summary="Not authenticated. Run: keyhole login",
+            data={"error_class": "NotAuthenticated", "is_local": True},
+            next_steps=map_capability_repair("NotAuthenticated"),
+        )
     try:
-        token = get_fresh_token()
+        token = get_fresh_token(keyhole_home=keyhole_home or None)
     except (FileNotFoundError, RuntimeError):
-        token = ""
+        token = session.access_token if session else ""
     identity_fp = session.token_fingerprint if session else ""
 
     if not token:
